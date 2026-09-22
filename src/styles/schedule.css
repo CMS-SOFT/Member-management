@@ -128,66 +128,6 @@
     gap: 5px;
 }
 
-.lesson-list-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 1px solid #eee5e8;
-    border-radius: 5px;
-    font-size: 13px;
-    white-space: nowrap;
-}
-
-.lesson-list-item>div:first-child {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.lesson-list-item b {
-    color: #332b30;
-}
-
-.lesson-list-item span {
-    color: #72696d;
-}
-
-.lesson-list-item i {
-    padding: 3px 7px;
-    border-radius: 8px;
-    color: #c88916;
-    background: #fff3dc;
-    font-size: 11px;
-    font-style: normal;
-    flex: 0 0 auto;
-}
-
-.lesson-list-item i.done {
-    color: var(--green);
-    background: #e5f6ef;
-}
-
-/* 항목 오른쪽 버튼 묶음(수정/삭제) */
-.lesson-list-item>div:last-child {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 0 0 auto;
-}
-
-.lesson-list-item.completed {
-    opacity: .62;
-}
-
-.lesson-list-item button:disabled {
-    cursor: default;
-    opacity: .45;
-}
-
 .empty-lessons {
     padding: 16px;
     color: #9a9197;
@@ -511,21 +451,6 @@
 
 .add-lesson-form .square-button {
     flex: 0 0 auto;
-}
-
-/* 목록 항목 회원명/버튼 */
-.lesson-list-item .lesson-item-name {
-    color: var(--wine);
-    font-weight: 800;
-}
-
-.lesson-list-item .square-button {
-    width: auto;
-    min-width: 48px;
-    height: 30px;
-    padding: 0 12px;
-    font-size: 12px;
-    font-weight: 700;
 }
 
 /* 모달 드래그 핸들 */

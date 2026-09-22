@@ -1,0 +1,71 @@
+/* LessonListModal 전용 스타일 */
+
+.lesson-list-modal .lesson-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px solid #eee5e8;
+    border-radius: 5px;
+    font-size: 13px;
+    white-space: nowrap;
+    background: #fff;
+}
+
+.lesson-list-modal .lesson-item-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.lesson-list-modal .lesson-item-date {
+    color: #332b30;
+    white-space: nowrap;
+}
+
+.lesson-list-modal .lesson-item-time {
+    color: #72696d;
+    white-space: nowrap;
+}
+
+.lesson-list-modal .lesson-item-name {
+    color: var(--wine);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.lesson-list-modal .lesson-item-status {
+    padding: 3px 7px;
+    border-radius: 8px;
+    color: #c88916;
+    background: #fff3dc;
+    font-size: 11px;
+    font-style: normal;
+    white-space: nowrap;
+}
+
+.lesson-list-modal .lesson-item-status.done {
+    color: var(--green);
+    background: #e5f6ef;
+}
+
+.lesson-list-modal .lesson-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.lesson-list-modal .lesson-list-item.completed {
+    opacity: 0.62;
+}
+
+.lesson-list-modal .empty-lessons {
+    padding: 16px;
+    color: #9a9197;
+    text-align: center;
+    font-size: 11px;
+}
