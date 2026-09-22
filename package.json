@@ -16,13 +16,18 @@
     "electron:build": "npm run build && electron-builder --win portable --x64"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.1",
     "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.5.2",
     "@capacitor/filesystem": "^8.1.3",
     "@capacitor/share": "^8.0.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "lucide-react": "^1.47.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.4",
+    "tailwindcss": "^4.3.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

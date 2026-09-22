@@ -1,15 +1,67 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Backdrop } from '../common';
+import '../../styles/MemberRegister.css';
 
-export function MemberRegister({ onSave, onClose }) {
-  const [form, setForm] = useState({ name: '', birth: '', phone: '', status: '미완료', history: '진행' });
+export function MemberRegister({ isOpen, onClose, onSave, member }) {
+  const [form, setForm] = useState({
+    name: '',
+    birth: '',
+    phone: '',
+    gender: '남',
+    lessonType: '개인',
+    lessonStatus: '등록',
+    history: '이용중'
+  });
 
-  // 레슨 일정 목록 상태 (기본 1개 제공, 최대 4회)
   const [lessonSchedules, setLessonSchedules] = useState([
     { dayOfWeek: '월요일', time: '10:00' }
   ]);
 
-  // 팝업창 드래그 이동을 위한 상태 및 레프
+  const [touched, setTouched] = useState({
+    name: false,
+    birth: false,
+    phone: false
+  });
+
+  // 커스텀 알림 팝업 메시지 상태 관리
+  const [alertMsg, setAlertMsg] = useState('');
+  const [focusTarget, setFocusTarget] = useState(null);
+
+  // 생년월일 인풋 제어용 Ref
+  const birthInputRef = useRef(null);
+
+  // 💡 DB에서 읽어온 데이터(member)를 그대로 바인딩하고, 신규 등록일 때만 초기값 세팅
+  useEffect(() => {
+    if (isOpen) {
+      if (member) {
+        setForm({
+          name: member.name || '',
+          birth: member.birth || '',
+          phone: member.phone || '',
+          gender: member.gender || '남',
+          lessonType: member.lessonType || '개인',
+          lessonStatus: member.lessonStatus || '등록',
+          history: member.history || '이용중'
+        });
+        setLessonSchedules(member.lessons || member.schedules || [{ dayOfWeek: '월요일', time: '10:00' }]);
+      } else {
+        // 완전 신규 등록 폼 초기값
+        setForm({
+          name: '',
+          birth: '',
+          phone: '',
+          gender: '남',
+          lessonType: '개인',
+          lessonStatus: '등록',
+          history: '이용중'
+        });
+        setLessonSchedules([{ dayOfWeek: '월요일', time: '10:00' }]);
+      }
+      setTouched({ name: false, birth: false, phone: false });
+      setAlertMsg('');
+    }
+  }, [isOpen, member]);
+
   const modalBoxRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
@@ -43,31 +95,17 @@ export function MemberRegister({ onSave, onClose }) {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  // 전화번호 자동 하이픈 포맷팅 함수
   const formatPhoneNumber = (value) => {
     const numbers = value.replace(/\D/g, '');
     if (numbers.length <= 3) {
       return numbers;
     } else if (numbers.length <= 7) {
       return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
-    } else if (numbers.length <= 11) {
-      return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
     } else {
       return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
     }
   };
 
-  const changeField = (event) => {
-    const { name, value } = event.target;
-    if (name === 'phone') {
-      const formatted = formatPhoneNumber(value);
-      setForm((currentForm) => ({ ...currentForm, phone: formatted }));
-    } else {
-      setForm((currentForm) => ({ ...currentForm, [name]: value }));
-    }
-  };
-
-  // 생년월일 6자리 유효성 검사 함수 (YYMMDD)
   const isValidBirth = (birthStr) => {
     const clean = birthStr.replace(/\D/g, '');
     if (clean.length !== 6) return false;
@@ -76,110 +114,249 @@ export function MemberRegister({ onSave, onClose }) {
     const dd = parseInt(clean.slice(4, 6), 10);
 
     if (mm < 1 || mm > 12) return false;
-    const daysInMonth = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    if (dd < 1 || dd > daysInMonth[mm]) return false;
+    if (dd < 1 || dd > 31) return false;
 
     return true;
   };
 
-  // 일정 칸 추가 함수 (최대 4회 제한)
+  const changeField = (event) => {
+    const { name, value } = event.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+
+    if (name === 'phone') {
+      const formatted = formatPhoneNumber(value);
+      setForm((currentForm) => ({ ...currentForm, phone: formatted }));
+    } else if (name === 'birth') {
+      const numbers = value.replace(/\D/g, '').slice(0, 6);
+      setForm((currentForm) => ({ ...currentForm, birth: numbers }));
+    } else {
+      setForm((currentForm) => ({ ...currentForm, [name]: value }));
+    }
+  };
+
   const handleAddScheduleSlot = () => {
     if (lessonSchedules.length >= 4) {
-      alert('레슨은 주 최대 4회까지 등록할 수 있습니다.');
+      setAlertMsg('레슨은 주 최대 4회까지 등록할 수 있습니다.');
       return;
     }
     setLessonSchedules([...lessonSchedules, { dayOfWeek: '수요일', time: '10:00' }]);
   };
 
-  // 일정 칸 삭제 함수
   const handleRemoveScheduleSlot = (index) => {
     if (lessonSchedules.length === 1) return;
     const updated = lessonSchedules.filter((_, i) => i !== index);
     setLessonSchedules(updated);
   };
 
-  // 저장 버튼 클릭 시 유효성 검사 및 저장
   const handleSave = () => {
     if (!form.name.trim()) {
-      alert('회원명을 입력해주세요.');
+      setAlertMsg('회원명을 입력해주세요.');
       return;
     }
     if (!isValidBirth(form.birth)) {
-      alert('올바른 생년월일 6자리(예: 740607)를 입력해주세요.');
+      setAlertMsg('생년월일 형식이 맞지 않습니다.');
+      setFocusTarget('birth');
       return;
     }
     if (form.phone.replace(/\D/g, '').length < 10) {
-      alert('전화번호를 올바르게 입력해주세요.');
+      setAlertMsg('전화번호를 올바르게 입력해주세요.');
       return;
     }
 
-    onSave({
-      ...form,
-      schedules: lessonSchedules
-    });
+    if (onSave) {
+      onSave({
+        ...form,
+        lessons: lessonSchedules,
+        schedules: lessonSchedules
+      });
+    }
   };
+
+  const handleAlertConfirm = () => {
+    setAlertMsg('');
+    if (focusTarget === 'birth') {
+      setTimeout(() => {
+        if (birthInputRef.current) {
+          birthInputRef.current.focus();
+        }
+      }, 0);
+      setFocusTarget(null);
+    }
+  };
+
+  const isNameValid = form.name.trim().length > 0;
+  const isBirthValid = isValidBirth(form.birth);
+  const isPhoneValid = form.phone.replace(/\D/g, '').length >= 10;
 
   return (
     <Backdrop onClose={onClose}>
       <div
         ref={modalBoxRef}
-        className="detail-modal"
+        className="detail-modal modal-content member-register-modal"
         style={{
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          position: 'relative',
           transform: `translate(${position.x}px, ${position.y}px)`,
-          transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out'
+          transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out',
+          position: 'relative'
         }}
       >
-        {/* 상단 헤더 영역 (불필요한 문구 제거, 마우스 드래그 이동 기능은 유지) */}
+        {alertMsg && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 2000,
+            borderRadius: '8px'
+          }}>
+            <div style={{
+              backgroundColor: '#fff',
+              padding: '24px',
+              borderRadius: '8px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+              width: '320px',
+              textAlign: 'center'
+            }}>
+              <p style={{ margin: '0 0 20px 0', fontSize: '15px', color: '#333', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
+                {alertMsg}
+              </p>
+              <button
+                type="button"
+                onClick={handleAlertConfirm}
+                style={{
+                  backgroundColor: '#900020',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '8px 20px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        )}
+
         <div
-          className="modal-header"
+          className="modal-header draggable-header"
           onMouseDown={handleMouseDown}
-          style={{ cursor: 'move', userSelect: 'none' }}
         >
           <div>
-            <h3>회원 등록</h3>
+            <h3>{member ? '회원 상세 정보' : '회원 등록'}</h3>
           </div>
         </div>
 
         <div className="detail-form">
+          {/* 회원명 */}
           <label className="field">
             <span>회원명</span>
-            <input name="name" value={form.name} onChange={changeField} placeholder="회원명을 입력하세요" />
+            <input
+              type="text"
+              name="name"
+              value={form.name}
+              onChange={changeField}
+              placeholder="회원명을 입력하세요"
+              autoComplete="off"
+              className={isNameValid ? 'valid-input' : ''}
+            />
           </label>
+
+          {/* 생년월일 */}
           <label className="field">
             <span>생년월일</span>
-            <input name="birth" value={form.birth} onChange={changeField} placeholder="yymmdd" />
+            <input
+              type="text"
+              name="birth"
+              ref={birthInputRef}
+              value={form.birth}
+              onChange={changeField}
+              placeholder="yymmdd (6자리)"
+              maxLength={6}
+              autoComplete="off"
+              className={
+                form.birth.length === 0
+                  ? ''
+                  : (isBirthValid ? 'valid-input' : 'invalid-input')
+              }
+            />
           </label>
+
+          {/* 전화번호 */}
           <label className="field">
             <span>전화번호</span>
-            <input name="phone" value={form.phone} onChange={changeField} placeholder="010-0000-0000" />
+            <input
+              type="text"
+              name="phone"
+              value={form.phone}
+              onChange={changeField}
+              onFocus={() => {
+                if (form.birth.length > 0 && !isValidBirth(form.birth)) {
+                  setAlertMsg('생년월일 형식이 맞지 않습니다.');
+                  setFocusTarget('birth');
+                }
+              }}
+              placeholder="010-0000-0000"
+              autoComplete="off"
+              className={
+                form.phone.length === 0
+                  ? ''
+                  : (isPhoneValid ? 'valid-input' : 'invalid-input')
+              }
+            />
           </label>
+
+          {/* 성별 */}
           <label className="field">
-            <span>레슨상태</span>
-            <select name="status" value={form.status} onChange={changeField}>
-              <option>완료</option>
-              <option>미완료</option>
-            </select>
-          </label>
-          <label className="field">
-            <span>이력상태</span>
-            <select name="history" value={form.history} onChange={changeField}>
-              <option>진행</option>
-              <option>만료</option>
+            <span>성별</span>
+            <select name="gender" value={form.gender} onChange={changeField}>
+              <option value="남">남</option>
+              <option value="여">여</option>
             </select>
           </label>
 
-          {/* 레슨 일정 요일 및 시간 동적 입력 영역 (주 최대 4회) */}
-          <div className="field" style={{ gridColumn: '1 / -1', marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontWeight: 'bold' }}>레슨 일정 등록 (주 최대 4회)</span>
+          {/* 레슨 구분 */}
+          <label className="field">
+            <span>레슨 구분</span>
+            <select name="lessonType" value={form.lessonType} onChange={changeField}>
+              <option value="개인">개인 레슨</option>
+              <option value="단체">단체 레슨</option>
+            </select>
+          </label>
+
+          {/* 레슨 상태 */}
+          <label className="field">
+            <span>레슨상태</span>
+            <select name="lessonStatus" value={form.lessonStatus} onChange={changeField}>
+              <option value="등록">등록</option>
+              <option value="완료">완료</option>
+            </select>
+          </label>
+
+          {/* 회원 상태 */}
+          <label className="field">
+            <span>회원 상태</span>
+            <select name="history" value={form.history} onChange={changeField}>
+              <option value="이용중">이용 중 (정상)</option>
+              <option value="만료됨">종료됨 (만료)</option>
+            </select>
+          </label>
+
+          {/* 레슨 일정 영역 */}
+          <div className="field full-width schedule-section-container">
+            <div className="schedule-header">
+              <span>레슨 일정 등록 (주 최대 4회)</span>
               {lessonSchedules.length < 4 && (
                 <button
                   type="button"
+                  className="add-schedule-btn"
                   onClick={handleAddScheduleSlot}
-                  style={{ padding: '4px 10px', fontSize: '12px', background: '#555', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                 >
                   + 일정 추가 ({lessonSchedules.length}/4)
                 </button>
@@ -187,7 +364,7 @@ export function MemberRegister({ onSave, onClose }) {
             </div>
 
             {lessonSchedules.map((schedule, index) => (
-              <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+              <div key={index} className="schedule-row">
                 <select
                   value={schedule.dayOfWeek}
                   onChange={(e) => {
@@ -195,7 +372,7 @@ export function MemberRegister({ onSave, onClose }) {
                     updated[index].dayOfWeek = e.target.value;
                     setLessonSchedules(updated);
                   }}
-                  style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  className="schedule-select"
                 >
                   <option value="월요일">월요일</option>
                   <option value="화요일">화요일</option>
@@ -206,22 +383,44 @@ export function MemberRegister({ onSave, onClose }) {
                   <option value="일요일">일요일</option>
                 </select>
 
-                <input
-                  type="time"
-                  value={schedule.time}
+                , <select
+                  value={schedule.time ? schedule.time.split(':')[0] : '10'}
                   onChange={(e) => {
+                    const hour = e.target.value;
+                    const minute = schedule.time ? schedule.time.split(':')[1] : '00';
                     const updated = [...lessonSchedules];
-                    updated[index].time = e.target.value;
+                    updated[index].time = `${hour}:${minute}`;
                     setLessonSchedules(updated);
                   }}
-                  style={{ flex: 1, padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
-                />
+                  className="schedule-select"
+                >
+                  {Array.from({ length: 24 }, (_, i) => {
+                    const h = String(i).padStart(2, '0');
+                    return <option key={h} value={h}>{h}시</option>;
+                  })}
+                </select>
+
+                <select
+                  value={schedule.time ? schedule.time.split(':')[1] : '00'}
+                  onChange={(e) => {
+                    const hour = schedule.time ? schedule.time.split(':')[0] : '10';
+                    const minute = e.target.value;
+                    const updated = [...lessonSchedules];
+                    updated[index].time = `${hour}:${minute}`;
+                    setLessonSchedules(updated);
+                  }}
+                  className="schedule-select"
+                >
+                  {['00', '10', '20', '30', '40', '50'].map((m) => (
+                    <option key={m} value={m}>{m}분</option>
+                  ))}
+                </select>
 
                 {lessonSchedules.length > 1 && (
                   <button
                     type="button"
+                    className="schedule-delete-btn"
                     onClick={() => handleRemoveScheduleSlot(index)}
-                    style={{ padding: '8px 12px', background: '#a94442', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
                   >
                     삭제
                   </button>
@@ -231,9 +430,9 @@ export function MemberRegister({ onSave, onClose }) {
           </div>
 
         </div>
-        <div className="detail-actions detail-actions--register">
-          <button className="primary-button" onClick={handleSave}>등록</button>
-          <button className="cancel-button" onClick={onClose}>취소</button>
+        <div className="modal-footer">
+          <button className="btn btn-save" onClick={handleSave}>{member ? '수정' : '등록'}</button>
+          <button className="btn btn-cancel" onClick={onClose}>취소</button>
         </div>
       </div>
     </Backdrop>
