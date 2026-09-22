@@ -113,7 +113,8 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
   };
 
   const registerMember = async (newMember) => {
-    const { schedules = [], ...memberData } = newMember;
+    // 💡 startDate 추출 추가
+    const { schedules = [], startDate, ...memberData } = newMember;
 
     if (schedules && schedules.length > 0) {
       const isOverlapping = schedules.some((newSch) => {
@@ -133,14 +134,16 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
 
     const dayMap = { '일요일': 0, '월요일': 1, '화요일': 2, '수요일': 3, '목요일': 4, '금요일': 5, '토요일': 6 };
     const generatedLessons = [];
-    const today = new Date();
+
+    // 💡 startDate가 있으면 해당 날짜를 기준으로, 없으면 오늘 날짜를 기준으로 설정
+    const baseDate = startDate ? new Date(startDate) : new Date();
 
     if (schedules && schedules.length > 0) {
       for (let week = 0; week < 4; week++) {
         schedules.forEach((sch) => {
           const targetDayNum = dayMap[sch.dayOfWeek];
           if (targetDayNum !== undefined) {
-            const d = new Date(today);
+            const d = new Date(baseDate);
             const currentDayNum = d.getDay();
             let diff = targetDayNum - currentDayNum;
             if (diff <= 0) diff += 7;

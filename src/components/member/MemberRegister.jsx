@@ -10,20 +10,21 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
     level: '중',
     lessonType: '개인',
     lessonStatus: '등록',
-    history: '이용중'
+    history: '이용중',
+    startDate: new Date().toISOString().split('T')[0]
   });
 
   const [lessonSchedules, setLessonSchedules] = useState([
     { dayOfWeek: '월요일', time: '10:00' }
   ]);
 
-  // 중앙 경고 팝업을 위한 상태 관리
   const [centerAlert, setCenterAlert] = useState('');
   const birthInputRef = useRef(null);
   const phoneInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
+      const initialDate = member?.startDate || new Date().toISOString().split('T')[0];
       if (member) {
         setForm({
           name: member.name || '',
@@ -33,7 +34,8 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
           level: member.level || '중',
           lessonType: member.lessonType || '개인',
           lessonStatus: member.lessonStatus || '등록',
-          history: member.history || '이용중'
+          history: member.history || '이용중',
+          startDate: initialDate
         });
         setLessonSchedules(member.lessons || member.schedules || [{ dayOfWeek: '월요일', time: '10:00' }]);
       } else {
@@ -45,7 +47,8 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
           level: '중',
           lessonType: '개인',
           lessonStatus: '등록',
-          history: '이용중'
+          history: '이용중',
+          startDate: initialDate
         });
         setLessonSchedules([{ dayOfWeek: '월요일', time: '10:00' }]);
       }
@@ -115,10 +118,34 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
     return true;
   };
 
+  // 시작일과 요일이 같거나 앞서있으면 무조건 다음 주 해당 요일로 계산하는 함수
+  const calculateScheduleDate = (startDateStr, dayOfWeekStr) => {
+    const daysMap = { '일요일': 0, '월요일': 1, '화요일': 2, '수요일': 3, '목요일': 4, '금요일': 5, '토요일': 6 };
+    const targetDay = daysMap[dayOfWeekStr];
+    if (targetDay === undefined) return startDateStr;
+
+    const [year, month, day] = startDateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+
+    const currentDay = date.getDay();
+    let diff = targetDay - currentDay;
+
+    // 시작일 당일이거나 과거라면 무조건 다음 주(7일 뒤)로 설정
+    if (diff <= 0) {
+      diff += 7;
+    }
+
+    date.setDate(date.getDate() + diff);
+
+    const rYear = date.getFullYear();
+    const rMonth = String(date.getMonth() + 1).padStart(2, '0');
+    const rDay = String(date.getDate()).padStart(2, '0');
+    return `${rYear}-${rMonth}-${rDay}`;
+  };
+
   const changeField = (event) => {
     const { name, value } = event.target;
     if (name === 'phone') {
-      // 생년월일이 유효하지 않으면 전화번호 입력을 막음
       if (!isValidBirth(form.birth)) {
         setCenterAlert('생년월일 확인하세요.');
         birthInputRef.current?.focus();
@@ -133,33 +160,18 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
     }
   };
 
-  // 생년월일 입력 칸에서 벗어날 때(onBlur) 유효성 검사 후 중앙 팝업 띄우기
   const handleBirthBlur = () => {
     if (form.birth.length > 0 && !isValidBirth(form.birth)) {
       setCenterAlert('생년월일 확인하세요.');
     }
   };
 
-  // 전화번호 칸을 클릭하거나 포커스하려 할 때 생년월일 검증
   const handlePhoneFocus = (e) => {
     if (!isValidBirth(form.birth)) {
-      e.target.blur(); // 전화번호 포커스 강제 해제 (입력 불가 처리)
+      e.target.blur();
       setCenterAlert('생년월일 확인하세요.');
       birthInputRef.current?.focus();
     }
-  };
-
-  const handleAddScheduleSlot = () => {
-    if (lessonSchedules.length >= 4) {
-      alert('레슨은 주 최대 4회까지 등록할 수 있습니다.');
-      return;
-    }
-    setLessonSchedules([...lessonSchedules, { dayOfWeek: '수요일', time: '10:00' }]);
-  };
-
-  const handleRemoveScheduleSlot = (index) => {
-    if (lessonSchedules.length === 1) return;
-    setLessonSchedules(lessonSchedules.filter((_, i) => i !== index));
   };
 
   const handleSave = () => {
@@ -178,11 +190,18 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
     }
 
     if (onSave) {
-      onSave({
+      const finalizedSchedules = lessonSchedules.map(sch => ({
+        ...sch,
+        date: calculateScheduleDate(form.startDate, sch.dayOfWeek)
+      }));
+
+      const savedData = {
         ...form,
-        lessons: lessonSchedules,
-        schedules: lessonSchedules
-      });
+        lessons: finalizedSchedules,
+        schedules: finalizedSchedules
+      };
+
+      onSave(savedData);
     }
   };
 
@@ -205,7 +224,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
           transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out',
         }}
       >
-        {/* 회원등록 창 중앙에 뜨는 커스텀 알림 팝업 */}
+        {/* 중앙 경고 팝업 */}
         {centerAlert && (
           <div style={{
             position: 'absolute',
@@ -218,10 +237,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 100,
-            borderTopLeftRadius: '8px',
-            borderTopRightRadius: '8px',
-            borderBottomLeftRadius: '8px',
-            borderBottomRightRadius: '8px'
+            borderRadius: '8px'
           }}>
             <div style={{
               backgroundColor: '#fff',
@@ -266,7 +282,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
         {/* 메인 컨테이너 */}
         <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* 1행: 회원명, 생년월일 (2열) */}
+          {/* 1행: 회원명, 생년월일 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#444' }}>회원명</span>
@@ -345,20 +361,50 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
           </div>
 
           {/* 레슨 일정 영역 */}
-          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid #eee', paddingTop: '16px' }}>
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid #eee', paddingTop: '16px' }}>
+
+            {/* 타이틀, 시작일, 일정 추가 버튼 한 줄 배치 */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#444' }}>레슨 일정 등록 (주 최대 4회)</span>
-              {lessonSchedules.length < 4 && (
-                <button
-                  type="button"
-                  onClick={handleAddScheduleSlot}
-                  style={{ backgroundColor: '#555', color: 'white', border: 'none', padding: '6px 12px', fontSize: '12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  + 일정 추가 ({lessonSchedules.length}/4)
-                </button>
-              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#666' }}>시작일:</span>
+                  <input
+                    type="date"
+                    name="startDate"
+                    value={form.startDate}
+                    onChange={changeField}
+                    style={{
+                      padding: '5px 8px',
+                      fontSize: '13px',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px',
+                      outline: 'none',
+                      backgroundColor: '#fff'
+                    }}
+                  />
+                </div>
+
+                {lessonSchedules.length < 4 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (lessonSchedules.length >= 4) {
+                        alert('레슨은 주 최대 4회까지 등록할 수 있습니다.');
+                        return;
+                      }
+                      setLessonSchedules([...lessonSchedules, { dayOfWeek: '수요일', time: '10:00' }]);
+                    }}
+                    style={{ backgroundColor: '#555', color: 'white', border: 'none', padding: '6px 12px', fontSize: '12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap' }}
+                  >
+                    + 일정 추가 ({lessonSchedules.length}/4)
+                  </button>
+                )}
+              </div>
             </div>
 
+            {/* 일정 목록 (요일, 시간 설정) */}
             {lessonSchedules.map((schedule, index) => (
               <div
                 key={index}
@@ -377,7 +423,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
                     updated[index].dayOfWeek = e.target.value;
                     setLessonSchedules(updated);
                   }}
-                  style={{ flex: 1.5, padding: '10px 8px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fff', outline: 'none' }}
+                  style={{ flex: 2, padding: '10px 8px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fff', outline: 'none' }}
                 >
                   <option value="월요일">월요일</option>
                   <option value="화요일">화요일</option>
@@ -397,7 +443,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
                     updated[index].time = `${hour}:${minute}`;
                     setLessonSchedules(updated);
                   }}
-                  style={{ flex: 1, padding: '10px 8px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fff', outline: 'none' }}
+                  style={{ flex: 1.5, padding: '10px 8px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fff', outline: 'none' }}
                 >
                   {Array.from({ length: 24 }, (_, i) => {
                     const h = String(i).padStart(2, '0');
@@ -414,7 +460,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
                     updated[index].time = `${hour}:${minute}`;
                     setLessonSchedules(updated);
                   }}
-                  style={{ flex: 1, padding: '10px 8px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fff', outline: 'none' }}
+                  style={{ flex: 1.5, padding: '10px 8px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', backgroundColor: '#fff', outline: 'none' }}
                 >
                   {['00', '10', '20', '30', '40', '50'].map((m) => (
                     <option key={m} value={m}>{m}분</option>
@@ -424,7 +470,10 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
                 {lessonSchedules.length > 1 && (
                   <button
                     type="button"
-                    onClick={() => handleRemoveScheduleSlot(index)}
+                    onClick={() => {
+                      if (lessonSchedules.length === 1) return;
+                      setLessonSchedules(lessonSchedules.filter((_, i) => i !== index));
+                    }}
                     style={{
                       flex: '0 0 auto',
                       padding: '10px 12px',

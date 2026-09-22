@@ -4,7 +4,7 @@ import { PageTitle, Summary } from './common';
 import { ArchiveViewer } from './ArchiveViewer';
 import { MemberDetail } from './member/MemberDetail';
 import { MemberRegister } from './member/MemberRegister';
-import { ReregisterModal } from './member/ReregisterModal';
+import { ReregisterModal } from "./member/ReregisterModal";
 import { MemberTable } from './member/MemberTable';
 import { ScheduleSection } from './schedule/ScheduleSection';
 import { LessonListModal } from './schedule/LessonListModal';
