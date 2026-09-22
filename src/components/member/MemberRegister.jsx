@@ -7,7 +7,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
     birth: '',
     phone: '',
     gender: '남',
-    level: '중', // 등급 기본값 '중'
+    level: '중',
     lessonType: '개인',
     lessonStatus: '등록',
     history: '이용중'
@@ -17,9 +17,10 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
     { dayOfWeek: '월요일', time: '10:00' }
   ]);
 
-  const [alertMsg, setAlertMsg] = useState('');
-  const [focusTarget, setFocusTarget] = useState(null);
+  // 중앙 경고 팝업을 위한 상태 관리
+  const [centerAlert, setCenterAlert] = useState('');
   const birthInputRef = useRef(null);
+  const phoneInputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -48,7 +49,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
         });
         setLessonSchedules([{ dayOfWeek: '월요일', time: '10:00' }]);
       }
-      setAlertMsg('');
+      setCenterAlert('');
     }
   }, [isOpen, member]);
 
@@ -95,25 +96,62 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
   const isValidBirth = (birthStr) => {
     const clean = birthStr.replace(/\D/g, '');
     if (clean.length !== 6) return false;
+
+    const yy = parseInt(clean.slice(0, 2), 10);
     const mm = parseInt(clean.slice(2, 4), 10);
     const dd = parseInt(clean.slice(4, 6), 10);
-    return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31;
+
+    if (mm < 1 || mm > 12) return false;
+
+    const lastDays = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (dd < 1 || dd > lastDays[mm]) return false;
+
+    if (mm === 2 && dd === 29) {
+      const fullYear = yy + (yy > 50 ? 1900 : 2000);
+      const isLeap = (fullYear % 4 === 0 && fullYear % 100 !== 0) || (fullYear % 400 === 0);
+      if (!isLeap) return false;
+    }
+
+    return true;
   };
 
   const changeField = (event) => {
     const { name, value } = event.target;
     if (name === 'phone') {
+      // 생년월일이 유효하지 않으면 전화번호 입력을 막음
+      if (!isValidBirth(form.birth)) {
+        setCenterAlert('생년월일 확인하세요.');
+        birthInputRef.current?.focus();
+        return;
+      }
       setForm((curr) => ({ ...curr, phone: formatPhoneNumber(value) }));
     } else if (name === 'birth') {
-      setForm((curr) => ({ ...curr, birth: value.replace(/\D/g, '').slice(0, 6) }));
+      const newBirth = value.replace(/\D/g, '').slice(0, 6);
+      setForm((curr) => ({ ...curr, birth: newBirth }));
     } else {
       setForm((curr) => ({ ...curr, [name]: value }));
     }
   };
 
+  // 생년월일 입력 칸에서 벗어날 때(onBlur) 유효성 검사 후 중앙 팝업 띄우기
+  const handleBirthBlur = () => {
+    if (form.birth.length > 0 && !isValidBirth(form.birth)) {
+      setCenterAlert('생년월일 확인하세요.');
+    }
+  };
+
+  // 전화번호 칸을 클릭하거나 포커스하려 할 때 생년월일 검증
+  const handlePhoneFocus = (e) => {
+    if (!isValidBirth(form.birth)) {
+      e.target.blur(); // 전화번호 포커스 강제 해제 (입력 불가 처리)
+      setCenterAlert('생년월일 확인하세요.');
+      birthInputRef.current?.focus();
+    }
+  };
+
   const handleAddScheduleSlot = () => {
     if (lessonSchedules.length >= 4) {
-      setAlertMsg('레슨은 주 최대 4회까지 등록할 수 있습니다.');
+      alert('레슨은 주 최대 4회까지 등록할 수 있습니다.');
       return;
     }
     setLessonSchedules([...lessonSchedules, { dayOfWeek: '수요일', time: '10:00' }]);
@@ -126,16 +164,16 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
 
   const handleSave = () => {
     if (!form.name.trim()) {
-      setAlertMsg('회원명을 입력해주세요.');
+      alert('회원명을 입력해주세요.');
       return;
     }
     if (!isValidBirth(form.birth)) {
-      setAlertMsg('생년월일 형식이 맞지 않습니다.');
-      setFocusTarget('birth');
+      setCenterAlert('생년월일 확인하세요.');
+      birthInputRef.current?.focus();
       return;
     }
     if (form.phone.replace(/\D/g, '').length < 10) {
-      setAlertMsg('전화번호를 올바르게 입력해주세요.');
+      alert('전화번호를 올바르게 입력해주세요.');
       return;
     }
 
@@ -145,14 +183,6 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
         lessons: lessonSchedules,
         schedules: lessonSchedules
       });
-    }
-  };
-
-  const handleAlertConfirm = () => {
-    setAlertMsg('');
-    if (focusTarget === 'birth') {
-      setTimeout(() => birthInputRef.current?.focus(), 0);
-      setFocusTarget(null);
     }
   };
 
@@ -175,15 +205,56 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
           transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out',
         }}
       >
-        {alertMsg && (
+        {/* 회원등록 창 중앙에 뜨는 커스텀 알림 팝업 */}
+        {centerAlert && (
           <div style={{
-            position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-            backgroundColor: 'rgba(0, 0, 0, 0.4)', display: 'flex', justifyContent: 'center',
-            alignItems: 'center', zIndex: 2000, borderRadius: '8px'
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 100,
+            borderTopLeftRadius: '8px',
+            borderTopRightRadius: '8px',
+            borderBottomLeftRadius: '8px',
+            borderBottomRightRadius: '8px'
           }}>
-            <div style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '8px', boxShadow: '0 4px 16px rgba(0,0,0,0.2)', width: '320px', textAlign: 'center' }}>
-              <p style={{ margin: '0 0 20px 0', fontSize: '15px', color: '#333', lineHeight: '1.5', whiteSpace: 'pre-line' }}>{alertMsg}</p>
-              <button type="button" onClick={handleAlertConfirm} style={{ backgroundColor: '#900020', color: '#fff', border: 'none', borderRadius: '4px', padding: '8px 20px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>확인</button>
+            <div style={{
+              backgroundColor: '#fff',
+              padding: '24px 32px',
+              borderRadius: '8px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              minWidth: '280px'
+            }}>
+              <span style={{ fontSize: '15px', fontWeight: 600, color: '#333' }}>
+                {centerAlert}
+              </span>
+              <button
+                onClick={() => {
+                  setCenterAlert('');
+                  birthInputRef.current?.focus();
+                }}
+                style={{
+                  backgroundColor: '#900020',
+                  color: '#fff',
+                  border: 'none',
+                  padding: '8px 20px',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                확인
+              </button>
             </div>
           </div>
         )}
@@ -204,15 +275,36 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#444' }}>생년월일</span>
-              <input type="text" name="birth" ref={birthInputRef} value={form.birth} onChange={changeField} placeholder="yymmdd (6자리)" maxLength={6} autoComplete="off" style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', outline: 'none' }} />
+              <input
+                type="text"
+                name="birth"
+                ref={birthInputRef}
+                value={form.birth}
+                onChange={changeField}
+                onBlur={handleBirthBlur}
+                placeholder="yymmdd (6자리)"
+                maxLength={6}
+                autoComplete="off"
+                style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', outline: 'none' }}
+              />
             </label>
           </div>
 
-          {/* 2행: 전화번호(넓게) / 성별(좁게) / 등급(좁게) -> 3열 배치 */}
+          {/* 2행: 전화번호 / 성별 / 등급 */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px' }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#444' }}>전화번호</span>
-              <input type="text" name="phone" value={form.phone} onChange={changeField} placeholder="010-0000-0000" autoComplete="off" style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', outline: 'none' }} />
+              <input
+                type="text"
+                name="phone"
+                ref={phoneInputRef}
+                value={form.phone}
+                onChange={changeField}
+                onFocus={handlePhoneFocus}
+                placeholder="010-0000-0000"
+                autoComplete="off"
+                style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box', outline: 'none', backgroundColor: !isValidBirth(form.birth) && form.birth.length > 0 ? '#f5f5f5' : '#fff' }}
+              />
             </label>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -233,7 +325,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
             </label>
           </div>
 
-          {/* 3행: 레슨 구분, 회원 상태 (2열) */}
+          {/* 3행: 레슨 구분, 회원 상태 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <span style={{ fontSize: '13px', fontWeight: 600, color: '#444' }}>레슨 구분</span>
@@ -357,8 +449,8 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
 
         {/* 모달 푸터 */}
         <div style={{ padding: '16px 24px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'flex-end', gap: '10px', backgroundColor: '#f9f9f9', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px' }}>
-          <button onClick={handleSave} style={{ padding: '10px 20px', fontSize: '14px', fontWeight: 600, border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: '#900020', color: 'white' }}>{member ? '수정' : '등록'}</button>
-          <button onClick={onClose} style={{ padding: '10px 20px', fontSize: '14px', fontWeight: 600, border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'white', color: '#333' }}>취소</button>
+          <button onClick={handleSave} style={{ padding: '10px 20px', fontSize: '14px', fontWeight: '600', border: 'none', borderRadius: '4px', cursor: 'pointer', backgroundColor: '#900020', color: 'white' }}>{member ? '수정' : '등록'}</button>
+          <button onClick={onClose} style={{ padding: '10px 20px', fontSize: '14px', fontWeight: '600', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'white', color: '#333' }}>취소</button>
         </div>
       </div>
     </Backdrop>
