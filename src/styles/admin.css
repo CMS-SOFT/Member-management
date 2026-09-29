@@ -120,23 +120,6 @@
     box-shadow: 0 9px 22px #2c202508;
 }
 
-.admin-section-heading {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    margin-bottom: 18px;
-}
-
-.admin-section-heading--end {
-    justify-content: flex-end;
-}
-
-.admin-section-heading h3 {
-    margin-top: 7px;
-    font-size: 16px;
-    font-weight: 500;
-}
-
 .add-button,
 .floating-add,
 .modal-add-button {
@@ -407,4 +390,16 @@
     .member-table-wrap {
         overflow-x: auto;
     }
+}
+
+/* 💡 추가할 네비게이션바 레이아웃용 스타일 */
+.admin-tabs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-tabs-left {
+    display: flex;
+    gap: 10px;
 }

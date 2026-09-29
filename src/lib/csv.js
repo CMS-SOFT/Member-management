@@ -9,7 +9,8 @@ function escapeCell(value) {
 
 // 간단한 CSV 파서 (따옴표로 감싼 셀, 이스케이프된 따옴표 지원)
 function parseCsv(text) {
-  const clean = text.replace(/^\uFEFF/, '');
+  // BOM 및 제어 문자 제거를 더 안전하게 처리 (특수 유니코드 문자 및 공백 제거)
+  const clean = text.replace(/^[\uFEFF\uFFFE\s]+/, '').trimStart();
   const rows = [];
   let row = [];
   let cell = '';
@@ -45,6 +46,14 @@ function rowsToRecords(rows, aliasMap) {
   });
 }
 
+// --- 날짜로부터 요일 추출 헬퍼 ---
+function getDayOfWeek(dateStr) {
+  const dateObj = new Date(dateStr);
+  if (isNaN(dateObj.getTime())) return '';
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  return days[dateObj.getDay()];
+}
+
 // --- 스케줄 CSV ---
 const SCHEDULE_COLUMNS = [
   ['date', '날짜'], ['time', '시간'], ['name', '회원명'], ['status', '상태'], ['note', '메모'],
@@ -58,18 +67,20 @@ export function schedulesToCsv(schedules) {
   const sorted = [...schedules].sort((a, b) =>
     String(a.date || '').localeCompare(String(b.date || ''))
     || String(a.name || '').localeCompare(String(b.name || ''), 'ko')
-    || String(a.time || '').localeCompare(String(b.time || '')));
+    || String(a.time || '').localeCompare(String(a.time || '')));
   const header = SCHEDULE_COLUMNS.map(([, label]) => label).join(',');
   const rows = sorted.map((schedule) => SCHEDULE_COLUMNS.map(([key]) => escapeCell(schedule[key])).join(','));
   return `\uFEFF${[header, ...rows].join('\r\n')}`;
 }
 
 export function csvToSchedules(text) {
-  return rowsToRecords(parseCsv(text), SCHEDULE_ALIASES)
+  const records = rowsToRecords(parseCsv(text), SCHEDULE_ALIASES);
+  console.log('변환된 레코드 원본:', records); // 이 로그가 어떻게 찍히는지 확인 필요
+
+  return records
     .map((record) => {
       const date = record.date || '';
       const name = record.name || '';
-      // 스케줄 날짜와 회원명을 기반으로 내부 passId 자동 생성 (예: 홍길동_260920)
       const dateObj = new Date(date);
       let passId = '';
       if (!isNaN(dateObj.getTime())) {
@@ -84,49 +95,91 @@ export function csvToSchedules(text) {
         name,
         status: record.status || '예약',
         note: record.note || '',
-        passId: record.passId || passId, // 업로드 파일에 passId가 있으면 사용, 없으면 자동 생성된 passId 사용
+        passId: record.passId || passId,
       };
     })
-    .filter((schedule) => schedule.date && schedule.name);
+    .filter((schedule) => {
+      const isValid = schedule.date && schedule.name;
+      if (!isValid) {
+        console.log('필터링되어 탈락한 스케줄:', schedule);
+      }
+      return isValid;
+    });
 }
 
-// --- 회원 CSV ---
+/**
+ * 스케줄 데이터로부터 회원별 고정 레슨 요일/시간(member_lessons 테이블용)을 안전하게 추출합니다.
+ * 동일한 회원-요일-시간 조합은 중복 제거됩니다.
+ */
+export function extractMemberLessons(schedules) {
+  const map = new Map();
+  (schedules || []).forEach((sch) => {
+    if (!sch.name || !sch.date || !sch.time) return;
+    const day = getDayOfWeek(sch.date);
+    if (!day) return;
+
+    const key = `${sch.name}_${day}_${sch.time}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        name: sch.name,
+        day: day,
+        time: sch.time,
+      });
+    }
+  });
+  return Array.from(map.values());
+}
+
+// Admin.jsx에서 직접 호출하는 파싱 함수들 추가
+export function parseSchedulesCsv(text) {
+  const schedules = csvToSchedules(text);
+  const memberLessons = extractMemberLessons(schedules);
+  return { schedules, memberLessons };
+}
+
+export function parseMembersCsv(text) {
+  return csvToMembers(text);
+}
+
+export function parsePassesCsv(text) {
+  return csvToPasses(text);
+}
+
+// --- 회원 CSV (실제 DB 구조 반영: name, birth, phone, gender, level, lessonType) ---
 const MEMBER_COLUMNS = [
   ['name', '회원명'], ['birth', '생년월일'], ['phone', '전화번호'],
-  ['gender', '성별'], ['level', '레벨'], ['day', '요일'], ['time', '시간'],
-  ['role', '구분'], ['status', '상태'],
+  ['gender', '성별'], ['level', '레벨'], ['lessonType', '수업형태'],
 ];
+
 const MEMBER_ALIASES = {
   회원명: 'name', 이름: 'name', 생년월일: 'birth', 전화번호: 'phone', 성별: 'gender', 레벨: 'level',
-  요일: 'day', 시간: 'time', 구분: 'role', 상태: 'status',
+  수업형태: 'lessonType', 레슨유형: 'lessonType',
   name: 'name', birth: 'birth', phone: 'phone', gender: 'gender', level: 'level',
-  day: 'day', time: 'time', role: 'role', status: 'status', id: '_ignore',
+  lessonType: 'lessonType', id: '_ignore',
 };
 
 export function membersToCsv(members) {
+  const filteredMembers = (members || []).filter(
+    (member) => member.role !== '관리자' && member.name !== '관리자'
+  );
   const header = MEMBER_COLUMNS.map(([, label]) => label).join(',');
-  const rows = (members || []).map((member) => MEMBER_COLUMNS.map(([key]) => escapeCell(member[key])).join(','));
+  const rows = filteredMembers.map((member) => MEMBER_COLUMNS.map(([key]) => escapeCell(member[key])).join(','));
   return `\uFEFF${[header, ...rows].join('\r\n')}`;
 }
 
 export function csvToMembers(text) {
-  const rows = parseCsv(text);
-  const members = rows.slice(1)
-    .map((cells) => {
-      return {
-        name: cells[0] || '',
-        birth: cells[1] || '',
-        phone: cells[2] || '',
-        gender: cells[3] || '',
-        level: cells[4] || '',
-        day: cells[5] || '',
-        time: cells[6] || '',
-        role: cells[7] || '사용자',
-        status: cells[8] || '등록',
-      };
-    })
+  return rowsToRecords(parseCsv(text), MEMBER_ALIASES)
+    .map((record) => ({
+      name: record.name || '',
+      birth: record.birth || '',
+      phone: record.phone || '',
+      gender: record.gender || '',
+      level: record.level || '',
+      lessonType: record.lessonType || '개인',
+      role: '사용자',
+      status: '등록',
+    }))
     .filter((member) => member.name && member.name.trim() !== '' && member.name !== '회원명');
-  return members;
 }
 
 // --- 이용권 CSV ---
@@ -151,7 +204,7 @@ export function passesToCsv(passes) {
 }
 
 export function csvToPasses(text) {
-  const currentDate = new Date('2026-09-21'); // 현재 기준일 적용
+  const currentDate = new Date('2026-09-21');
   return rowsToRecords(parseCsv(text), PASS_ALIASES)
     .map((record) => {
       const name = record.name || '';
@@ -159,7 +212,6 @@ export function csvToPasses(text) {
       let used = Number(record.used || 0);
       const registeredAt = record.registeredAt || new Date().toISOString().slice(0, 10);
 
-      // passId 자동 생성 (회원명_YYMMDD)
       let passId = record.passId || '';
       if (!passId && registeredAt) {
         const dt = new Date(registeredAt);
@@ -171,10 +223,8 @@ export function csvToPasses(text) {
         }
       }
 
-      // 2026년 9월 21일 기준 과거 이용권은 자동 만료 처리 (사용횟수 = 전체횟수)
       const regDateObj = new Date(registeredAt);
       if (!isNaN(regDateObj.getTime()) && regDateObj < currentDate) {
-        // 단, 이미 사용횟수가 명시되어 있고 최신 데이터인 경우가 아니라 과거 일괄 처리 대상일 때 반영
         if (record.used === '' || record.used == null) {
           used = total;
         }
@@ -200,15 +250,15 @@ export function scheduleTemplateCsv() {
 }
 export function memberTemplateCsv() {
   const header = MEMBER_COLUMNS.map(([, label]) => label).join(',');
-  return `\uFEFF${header}\r\n홍길동,900101,010-1234-5678,남,중,월,18:00,사용자,등록`;
+  return `\uFEFF${header}\r\n홍길동,900101,010-1234-5678,남,중,개인`;
 }
 export function passTemplateCsv() {
   const header = PASS_COLUMNS.map(([, label]) => label).join(',');
   return `\uFEFF${header}\r\n홍길동,8,0,2026-09-01`;
 }
 
-// 다운로드 처리 함수
-function downloadCsvWeb(filename, csvText) {
+// 다운로드 처리 함수 (수정된 버전: 올바른 인자 순서 처리)
+function downloadCsvWeb(csvText, filename) {
   const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -220,7 +270,7 @@ function downloadCsvWeb(filename, csvText) {
   URL.revokeObjectURL(url);
 }
 
-async function downloadCsvNative(filename, csvText) {
+async function downloadCsvNative(csvText, filename) {
   const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
   const { Share } = await import('@capacitor/share');
   await Filesystem.writeFile({ path: filename, data: csvText, directory: Directory.Cache, encoding: Encoding.UTF8 });
@@ -230,11 +280,11 @@ async function downloadCsvNative(filename, csvText) {
   } catch { }
 }
 
-export function downloadCsv(filename, csvText) {
+export function downloadCsv(csvText, filename) {
   const cap = typeof window !== 'undefined' ? window.Capacitor : undefined;
   if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) {
-    downloadCsvNative(filename, csvText).catch(() => downloadCsvWeb(filename, csvText));
+    downloadCsvNative(csvText, filename).catch(() => downloadCsvWeb(csvText, filename));
     return;
   }
-  downloadCsvWeb(filename, csvText);
+  downloadCsvWeb(csvText, filename);
 }

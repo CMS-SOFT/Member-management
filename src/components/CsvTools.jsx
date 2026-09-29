@@ -1,14 +1,14 @@
 import React, { useState, useRef } from 'react';
 import {
-  schedulesToCsv, csvToSchedules,
   membersToCsv, csvToMembers,
   passesToCsv, csvToPasses,
-  scheduleTemplateCsv, memberTemplateCsv, passTemplateCsv,
+  memberTemplateCsv, passTemplateCsv,
   downloadCsv,
 } from '../lib/csv';
 import {
   requestBootstrap,
-  replaceAllSchedules, replaceAllMembers, replaceAllPasses,
+  replaceAllMembers, replaceAllPasses,
+  // SQLite3에서 전체 데이터를 가져오는 함수가 있다면 여기서 임포트합니다.
 } from '../lib/db';
 
 // 1. 관리자 비밀번호 확인 및 완료 모달 컴포넌트
@@ -83,7 +83,7 @@ function ClearConfirmModal({ members = [], onConfirm, onCancel }) {
           <div style={{ textAlign: 'center', padding: '15px 0' }}>
             <h3 style={{ marginBottom: '15px' }}>초기화되었습니다.</h3>
             <p style={{ color: '#666', marginBottom: '25px', fontSize: '14px' }}>
-              관리자 계정을 제외한 모든 회원, 스케줄, 이용권 데이터가 안전하게 지워졌습니다.
+              모든 데이터가 지워졌습니다.
             </p>
             <div className="modal-actions" style={{ display: 'flex', gap: '10px' }}>
               <button
@@ -101,15 +101,15 @@ function ClearConfirmModal({ members = [], onConfirm, onCancel }) {
   );
 }
 
-// 2. 메인 자료 관리 도구 컴포넌트
-export function CsvTools({ members, schedules, passes, onImported, onError, onArchiveExport, onArchiveView, onClearData }) {
+// 2. 메인 자료 관리 도구 컴포넌트 (스케줄 관련 항목 제외)
+export function CsvTools({ members, passes, onImported, onError, onArchiveExport, onArchiveView, onClearData }) {
   const [open, setOpen] = useState(false);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
-  const scheduleInput = useRef(null);
   const memberInput = useRef(null);
   const passInput = useRef(null);
   const today = new Date().toISOString().slice(0, 10);
 
+  // 파일 업로드 (가져오기) 처리
   const importFile = async (event, parse, replace) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -118,29 +118,29 @@ export function CsvTools({ members, schedules, passes, onImported, onError, onAr
       let parsed = [];
       const fileName = file.name.toLowerCase();
 
-      // 엑셀 파일(.xlsx, .xls)인 경우 처리
       if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-        // xlsx 라이브러리를 동적으로 불러옵니다 (설치되어 있어야 합니다)
         const XLSX = await import('xlsx');
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
-
-        // 첫 번째 시트 이름을 가져옵니다
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
-
-        // 엑셀 시트 데이터를 CSV 문자열 형태로 변환하여 기존 parse 함수에 태웁니다
         const csvText = XLSX.utils.sheet_to_csv(worksheet);
         parsed = parse(csvText);
       } else {
-        // 기존 CSV 파일 처리 방식
         const buffer = await file.arrayBuffer();
         const decoder = new TextDecoder('euc-kr');
         const text = decoder.decode(buffer);
         parsed = parse(text);
       }
 
+      const hasContent = Array.isArray(parsed)
+        ? parsed.length > 0
+        : (parsed && Object.keys(parsed).length > 0);
+
+      if (!hasContent) throw new Error('파일에서 불러올 내용을 찾지 못했어요.');
+
       if (!parsed.length) throw new Error('파일에서 불러올 내용을 찾지 못했어요.');
+      console.log('replace에 전달되는 데이터:', parsed);
       await replace(parsed);
       const fresh = await requestBootstrap();
       onImported(fresh);
@@ -150,26 +150,41 @@ export function CsvTools({ members, schedules, passes, onImported, onError, onAr
     }
   };
 
+  // SQLite DB 기반 최신 데이터를 반영하여 내려받기 실행
+  const handleDownload = async (type) => {
+    try {
+      const currentData = await requestBootstrap();
+
+      if (type === 'pass') {
+        const dataToExport = currentData?.passes || passes;
+        downloadCsv(`이용권-${today}.csv`, passesToCsv(dataToExport));
+      } else if (type === 'member') {
+        const dataToExport = currentData?.members || members;
+        downloadCsv(`회원-${today}.csv`, membersToCsv(dataToExport));
+      }
+    } catch (err) {
+      console.error("내려받기 중 오류 발생:", err);
+      downloadCsv(
+        `${type === 'pass' ? '이용권' : '회원'}-${today}.csv`,
+        type === 'pass' ? passesToCsv(passes) : membersToCsv(members)
+      );
+    }
+  };
+
   return (
     <div className="csv-tools">
       <button className="csv-button" onClick={() => setOpen((value) => !value)}>자료 관리 ▾</button>
       {open && (
         <div className="csv-menu" onMouseLeave={() => setOpen(false)}>
           <div className="csv-menu-row">
-            <b>스케줄</b>
-            <button onClick={() => downloadCsv(`스케줄-${today}.csv`, schedulesToCsv(schedules))}>내려받기</button>
-            <button onClick={() => scheduleInput.current?.click()}>불러오기</button>
-            <button onClick={() => downloadCsv('스케줄-빈양식.csv', scheduleTemplateCsv())}>빈 양식</button>
-          </div>
-          <div className="csv-menu-row">
             <b>이용권</b>
-            <button onClick={() => downloadCsv(`이용권-${today}.csv`, passesToCsv(passes))}>내려받기</button>
+            <button onClick={() => handleDownload('pass')}>내려받기</button>
             <button onClick={() => passInput.current?.click()}>불러오기</button>
             <button onClick={() => downloadCsv('이용권-빈양식.csv', passTemplateCsv())}>빈 양식</button>
           </div>
           <div className="csv-menu-row">
             <b>회원</b>
-            <button onClick={() => downloadCsv(`회원-${today}.csv`, membersToCsv(members))}>내려받기</button>
+            <button onClick={() => handleDownload('member')}>내려받기</button>
             <button onClick={() => memberInput.current?.click()}>불러오기</button>
             <button onClick={() => downloadCsv('회원-빈양식.csv', memberTemplateCsv())}>빈 양식</button>
           </div>
@@ -187,16 +202,9 @@ export function CsvTools({ members, schedules, passes, onImported, onError, onAr
         </div>
       )}
       <input
-        ref={scheduleInput}
-        type="file"
-        accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-        hidden
-        onChange={(event) => importFile(event, csvToSchedules, replaceAllSchedules)}
-      />
-      <input
         ref={memberInput}
         type="file"
-        accept=".csv, .xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+        accept=".csv, .xls, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
         hidden
         onChange={(event) => importFile(event, csvToMembers, replaceAllMembers)}
       />
@@ -212,19 +220,15 @@ export function CsvTools({ members, schedules, passes, onImported, onError, onAr
           members={members}
           onConfirm={async () => {
             try {
-              // 1. 관리자 계정은 보존하고 일반 회원만 골라내거나 비우기
-              // members 배열에서 'role'이 '관리자'이거나 이름이 '관리자'인 계정만 필터링합니다.
               const adminMembers = (members || []).filter(m => m.role === '관리자' || m.name === '관리자');
 
-              if (typeof replaceAllSchedules === 'function') await replaceAllSchedules([]);
               if (typeof replaceAllPasses === 'function') await replaceAllPasses([]);
-              if (typeof replaceAllMembers === 'function') await replaceAllMembers(adminMembers); // 관리자만 남김
+              if (typeof replaceAllMembers === 'function') await replaceAllMembers(adminMembers);
 
               if (typeof onClearData === 'function') {
                 await onClearData();
               }
 
-              // 최신 데이터를 다시 불러와서 화면에 반영 (로그인 튕김 방지)
               const fresh = await requestBootstrap();
               if (typeof onImported === 'function') {
                 onImported(fresh);

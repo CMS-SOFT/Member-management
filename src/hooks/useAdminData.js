@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { clearAllData, collectArchivableSchedules, removeSchedulesByIds, requestBootstrap } from '../lib/db';
-import { schedulesToCsv, downloadCsv } from '../lib/csv';
+import { requestBootstrap } from '../lib/bootstrapService';
 
 const isSameSchedule = (a, b) =>
   (a.id != null && String(a.id) === String(b.id)) ||
@@ -13,23 +12,25 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
   const [selectedDate, setSelectedDate] = useState(null);
   const [editingLesson, setEditingLesson] = useState(null);
   const [syncError, setSyncError] = useState('');
-  const [toast, setToast] = useState('');
+
+  // 💡 토스트 대신 중앙 팝업 알림용 상태로 활용할 수 있습니다.
+  const [centerAlert, setCenterAlert] = useState('');
+
   const [scheduleFilter, setScheduleFilter] = useState('전체');
   const [scheduleView, setScheduleView] = useState('calendar');
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [reregisterMember, setReregisterMember] = useState(null);
   const [isClearConfirm, setIsClearConfirm] = useState(false);
+  const [isClearDoneModal, setIsClearDoneModal] = useState(false);
 
   const lessons = schedules || [];
   const passList = passes || [];
 
-  // 회원별 이용권 및 진행 횟수 계산 함수
   const passSummaryOf = (name, lessonDate, lessonTime) => {
     if (!name) return { used: 0, total: 4 };
 
     const cleanName = (n) => String(n || '').trim();
-
     const targetDate = lessonDate || editingLesson?.date;
     const targetTime = lessonTime || editingLesson?.time;
 
@@ -43,7 +44,6 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
       .filter((l) => cleanName(l.name) === cleanName(name))
       .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
 
-    // 날짜가 특정된 경우(모달창 등): 해당 레슨의 전체 일정 중 순번(1~12) 반환
     if (targetDate) {
       let index = memberLessons.findIndex((l) => l.date === targetDate && (!targetTime || l.time === targetTime));
       if (index === -1) {
@@ -51,20 +51,13 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
       }
       let seq = index !== -1 ? index + 1 : 1;
       seq = Math.min(Math.max(seq, 1), totalCount);
-      return {
-        used: seq,
-        total: totalCount
-      };
+      return { used: seq, total: totalCount };
     }
 
-    // 날짜가 없는 경우(일반 목록 테이블 등): 완료된 레슨 수 반환
     const completedCount = memberLessons.filter((l) => l.status === '완료').length;
     const usedCount = Math.min(Math.max(completedCount, 0), totalCount);
 
-    return {
-      used: usedCount,
-      total: totalCount
-    };
+    return { used: usedCount, total: totalCount };
   };
 
   const memberPassSummary = (name) => {
@@ -81,17 +74,15 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
 
   const canSchedule = (name) => passList.some((pass) => pass.name === name && pass.status !== '완료' && Number(pass.remaining) > 0);
 
+  // 💡 토스트 메시지 대신 팝업(알림) 상태로 변경
   const notifyPassChange = (changedPass) => {
     if (!changedPass) return;
-    if (changedPass.status === '완료') setToast(`${changedPass.name} 회원의 이용권을 다 썼어요. '완료'로 바뀌었어요.`);
-    else if (Number(changedPass.remaining) <= 1) setToast(`${changedPass.name} 회원의 이용권이 ${changedPass.remaining}회 남았어요.`);
+    if (changedPass.status === '완료') {
+      setCenterAlert(`${changedPass.name} 회원의 이용권을 다 썼어요. '완료'로 바뀌었어요.`);
+    } else if (Number(changedPass.remaining) <= 1) {
+      setCenterAlert(`${changedPass.name} 회원의 이용권이 ${changedPass.remaining}회 남았어요.`);
+    }
   };
-
-  useEffect(() => {
-    if (!toast) return undefined;
-    const timer = window.setTimeout(() => setToast(''), 4000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
 
   const applyLessons = (nextLessons) => { onSchedulesChange(nextLessons); };
 
@@ -112,84 +103,41 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
     setSelectedMember(null);
   };
 
-  const registerMember = async (newMember) => {
-    // 💡 startDate 추출 추가
-    const { schedules = [], startDate, ...memberData } = newMember;
-
-    if (schedules && schedules.length > 0) {
-      const isOverlapping = schedules.some((newSch) => {
-        return lessons.some((existing) => {
-          return existing.dayOfWeek === newSch.dayOfWeek && existing.time === newSch.time;
-        });
-      });
-
-      if (isOverlapping) {
-        alert('다른 회원과 스케줄이 겹칩니다. 시간 조정을 해 주세요.');
-        return;
+  const registerMember = async (savedData) => {
+    const payload = {
+      action: 'appendMember',
+      member: {
+        name: savedData.name,
+        birth: savedData.birth,
+        phone: savedData.phone,
+        gender: savedData.gender,
+        level: savedData.level,
+        lessonType: savedData.lessonType,
+        history: savedData.history,
+        startDate: savedData.startDate,
+        lessons: savedData.lessons
       }
-    }
-
-    await apiRequest({ action: 'appendMember', member: memberData });
-    setMembers((currentMembers) => [...currentMembers, memberData]);
-
-    const dayMap = { '일요일': 0, '월요일': 1, '화요일': 2, '수요일': 3, '목요일': 4, '금요일': 5, '토요일': 6 };
-    const generatedLessons = [];
-
-    // 💡 startDate가 있으면 해당 날짜를 기준으로, 없으면 오늘 날짜를 기준으로 설정
-    const baseDate = startDate ? new Date(startDate) : new Date();
-
-    if (schedules && schedules.length > 0) {
-      for (let week = 0; week < 4; week++) {
-        schedules.forEach((sch) => {
-          const targetDayNum = dayMap[sch.dayOfWeek];
-          if (targetDayNum !== undefined) {
-            const d = new Date(baseDate);
-            const currentDayNum = d.getDay();
-            let diff = targetDayNum - currentDayNum;
-            if (diff <= 0) diff += 7;
-            d.setDate(d.getDate() + diff + (week * 7));
-
-            const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-            generatedLessons.push({
-              date: dateStr,
-              time: sch.time,
-              name: memberData.name,
-              status: '예약'
-            });
-          }
-        });
-      }
-    }
-
-    const totalLessonCount = generatedLessons.length > 0 ? generatedLessons.length : 8;
-    const newPass = {
-      name: memberData.name,
-      total: totalLessonCount,
-      used: 0,
-      remaining: totalLessonCount,
-      status: '이용중',
-      registeredAt: new Date().toISOString().slice(0, 10)
     };
-    await addPass(newPass);
 
-    for (const lesson of generatedLessons) {
-      await apiRequest({ action: 'updateSchedule', schedule: lesson });
+    console.log('📌 [Frontend] 서버로 전송하는 회원 등록 페이로드:', JSON.stringify(payload, null, 2));
+
+    // 💡 try...catch로 감싸지 말고 에러를 그대로 상위로 던지게 둡니다!
+    const response = await apiRequest(payload);
+
+    if (response && response.success) {
+      setIsRegisterOpen(false);
+      requestBootstrap();
+      setCenterAlert('회원이 성공적으로 등록되었습니다.');
+    } else if (response && (response.error || response.message)) {
+      throw new Error(response.error || response.message);
     }
 
-    const refreshed = await requestBootstrap();
-    if (refreshed && refreshed.schedules) {
-      onSchedulesChange(refreshed.schedules);
-    }
-
-    setIsRegisterOpen(false);
-    setToast(`${memberData.name} 회원을 등록하고 미래 일정을 자동 생성했어요.`);
+    return response;
   };
 
   const addPass = async (pass) => {
     const result = await apiRequest({ action: 'appendPass', pass });
     if (result.passes) onPassesChange(result.passes);
-    setToast(`${pass.name} 회원의 이용권(${pass.total}회)을 추가했어요.`);
   };
 
   const removePass = async (pass) => {
@@ -203,7 +151,7 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
       if (result.passes) onPassesChange(result.passes);
       if (result.schedules) onSchedulesChange(result.schedules);
       setReregisterMember(null);
-      setToast(`${payload.name} 회원을 다시 등록하고 레슨 ${payload.schedules.length}개를 잡았어요.`);
+      setCenterAlert(`${payload.name} 회원을 다시 등록했어요.`);
     } catch (error) {
       setSyncError(`다시 등록하지 못했어요. ${error.message || ''}`);
     }
@@ -238,11 +186,11 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
 
   const confirmClearData = async () => {
     try {
-      const fresh = await clearAllData();
+      const fresh = await apiRequest({ action: 'clear' });
       setMembers(fresh.members || []);
       onSchedulesChange(fresh.schedules || []);
       onPassesChange(fresh.passes || []);
-      setToast('모든 자료를 지웠어요.');
+      setIsClearDoneModal(true);
     } catch (error) {
       setSyncError(`자료를 지우지 못했어요. ${error.message || ''}`);
     } finally {
@@ -282,13 +230,15 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
     selectedDate, setSelectedDate,
     editingLesson, setEditingLesson,
     syncError, setSyncError,
-    toast, setToast,
+    toast: centerAlert, // 기존 토스트 참조를 팝업 상태로 연결
+    setToast: setCenterAlert,
     scheduleFilter, setScheduleFilter,
     scheduleView, setScheduleView,
     archiveTarget, setArchiveTarget,
     isArchiveOpen, setIsArchiveOpen,
     reregisterMember, setReregisterMember,
     isClearConfirm, setIsClearConfirm,
+    isClearDoneModal, setIsClearDoneModal,
     selectedMonth,
     filteredLessons, monthLessons, stats,
     passSummaryOf, memberPassSummary, canSchedule,

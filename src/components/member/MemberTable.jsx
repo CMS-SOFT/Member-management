@@ -3,9 +3,6 @@ import { Status } from '../common';
 // 회원정보 탭: 회원 목록 표. 회원 이름 클릭 시 상세 열기, 완료(재등록 대상) 회원은 재등록 버튼 노출.
 export function MemberTable({ members, memberPassSummary, onOpenMember, onOpenRegister, onReregister }) {
   return <section className="admin-section">
-    <div className="admin-section-heading admin-section-heading--end">
-      <button className="add-button" onClick={onOpenRegister}>＋ 회원 등록</button>
-    </div>
     <div className="member-table-wrap">
       <table className="member-table">
         <thead>
