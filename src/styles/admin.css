@@ -1,0 +1,405 @@
+/* admin.css — 관리자 대시보드: 전체 틀, 상단 통계카드, 탭, 회원표, 달력(그리드) */
+
+/* Admin desk presentation
+   창(app-window) 틀(테두리·라운드·최대폭)은 로그인 화면과 똑같이 layout.css 것을 그대로 씁니다.
+   여기서는 관리자 콘텐츠 여백만 조정합니다. */
+.app-shell:has(.admin-dashboard) .app-content {
+    flex: 1;
+    padding: 28px 32px 60px;
+}
+
+.admin-dashboard {
+    margin: 0 auto;
+    color: #262127;
+}
+
+.sheet-warning {
+    margin: 12px 0 -2px;
+    padding: 10px 12px;
+    border: 1px solid #e8b7c3;
+    border-radius: 5px;
+    color: #8b2343;
+    background: #fff4f6;
+    font-size: 10px;
+    line-height: 1.5;
+}
+
+.admin-dashboard .page-title {
+    align-items: end;
+    padding: 0 0 20px;
+    border-bottom: 1px solid #eee8ea;
+}
+
+.admin-dashboard .page-title h2 {
+    margin-top: 12px;
+    color: #262127;
+    font-size: 27px;
+    font-weight: 500;
+    letter-spacing: -.07em;
+}
+
+.admin-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin: 18px 0 23px;
+}
+
+.admin-summary .summary-item {
+    min-height: 66px;
+    padding: 12px 22px;
+    border-left-width: 2px;
+    background: #fcf8f9;
+}
+
+.admin-summary .summary-item::first-letter {
+    color: var(--wine);
+}
+
+.admin-summary .summary-item span {
+    order: 1;
+    margin-left: 28px;
+    font-size: 10px;
+}
+
+.admin-summary .summary-item strong {
+    order: 2;
+    margin-left: 28px;
+    font-size: 19px;
+}
+
+.admin-summary .summary-item {
+    position: relative;
+}
+
+.admin-summary .summary-item::before {
+    content: attr(data-icon);
+    position: absolute;
+    left: 17px;
+    top: 21px;
+    color: var(--wine);
+    font-size: 20px;
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 23px;
+    height: 39px;
+    border-bottom: 1px solid #e9e3e5;
+}
+
+.admin-tabs button {
+    position: relative;
+    padding: 0 2px 13px;
+    border: 0;
+    color: #9b9297;
+    background: none;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.admin-tabs button.active {
+    color: var(--wine);
+}
+
+.admin-tabs button.active::after {
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 2px;
+    background: var(--wine);
+    content: '';
+}
+
+.admin-section {
+    margin-top: 12px;
+    padding: 21px 24px 20px;
+    border: 1px solid #e8e1e4;
+    border-radius: 9px;
+    box-shadow: 0 9px 22px #2c202508;
+}
+
+.add-button,
+.floating-add,
+.modal-add-button {
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    background: var(--wine);
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.add-button {
+    padding: 10px 13px;
+}
+
+.member-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+}
+
+.member-table th {
+    height: 40px;
+    padding: 0 18px;
+    color: #fff;
+    background: var(--wine);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.member-table td {
+    height: 46px;
+    padding: 0 18px;
+    border-bottom: 1px solid #eee5e8;
+    color: #766f73;
+    white-space: nowrap;
+}
+
+.member-table th:first-child,
+.member-table td:first-child {
+    padding-left: 22px;
+}
+
+.member-table th:last-child,
+.member-table td:last-child {
+    padding-right: 22px;
+}
+
+.member-table tbody tr {
+    cursor: pointer;
+}
+
+.member-table tbody tr:hover td {
+    background: #fff7f8;
+}
+
+.member-table .member-name {
+    color: var(--wine);
+    font-weight: 800;
+}
+
+.member-table .status {
+    font-size: 10px;
+}
+
+.month-switcher {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    color: var(--wine);
+    font-size: 11px;
+}
+
+.month-switcher button {
+    border: 0;
+    color: var(--wine);
+    background: transparent;
+    font-size: 19px;
+    line-height: 1;
+}
+
+/* 관리자 달력 (기본 .calendar 위에 덧씌움) */
+.admin-calendar {
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid #eee5e8;
+}
+
+.admin-calendar .calendar-weekdays,
+.admin-calendar .calendar-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    min-width: 0;
+}
+
+.admin-calendar .calendar-weekdays b {
+    padding: 10px 4px;
+    background: #fff;
+    font-size: 9px;
+}
+
+.admin-calendar .calendar-grid {
+    border-top: 1px solid #eee5e8;
+}
+
+.admin-calendar-day {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    min-height: 104px;
+    padding: 4px 5px 6px;
+    border: 0;
+    border-right: 1px solid #eee5e8;
+    border-bottom: 1px solid #eee5e8;
+    background: #fff;
+    text-align: left;
+    vertical-align: top;
+}
+
+.admin-calendar-day:nth-child(7n) {
+    border-right: 0;
+}
+
+.admin-calendar-day:hover {
+    background: #fffafb;
+}
+
+.admin-calendar-day strong {
+    display: block;
+    margin: 0;
+    color: #262127;
+    font-size: 11px;
+    line-height: 1.1;
+    text-align: left;
+}
+
+.admin-calendar-day.outside strong {
+    color: #c9c2c5;
+}
+
+.admin-calendar-day span {
+    display: block;
+    margin: 0;
+    padding: 4px 5px;
+    border-left: 2px solid var(--wine);
+    border-radius: 2px;
+    color: #332b30;
+    background: #fff1f4;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.3;
+}
+
+.admin-calendar-day span em {
+    display: block;
+    color: var(--wine);
+    font-size: 10px;
+    font-style: normal;
+}
+
+.admin-calendar-day span small {
+    display: block;
+    color: #c38a18;
+    font-size: 7px;
+    font-weight: 700;
+}
+
+.admin-calendar-day span small::before {
+    content: '• ';
+}
+
+.admin-calendar-day span[role="button"] {
+    cursor: pointer;
+}
+
+.admin-calendar-day span[role="button"]:hover {
+    outline: 1px solid var(--wine);
+}
+
+.admin-calendar-day span.completed {
+    border-left-color: #9b9699;
+    color: #756f73;
+    background: #f0edef;
+    cursor: pointer;
+}
+
+.admin-calendar-day span.completed:hover {
+    outline: 1px solid #9b9699;
+}
+
+.admin-calendar-day span.incomplete {
+    border-left-color: var(--wine);
+    color: #332b30;
+    background: #fff1f4;
+}
+
+/* 달력 회차 배지 */
+.admin-calendar-day .pass-count {
+    display: inline-block;
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: #f0dbe0;
+    color: var(--wine);
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.floating-add {
+    display: none;
+}
+
+/* 관리자 화면 반응형 */
+@media (max-width: 700px) {
+    .app-shell:has(.admin-dashboard) .app-content {
+        padding: 24px 16px 42px;
+    }
+
+    .admin-dashboard .page-title h2 {
+        font-size: 23px;
+    }
+
+    .admin-summary {
+        gap: 6px;
+    }
+
+    .admin-summary .summary-item {
+        padding: 10px 7px;
+    }
+
+    .admin-summary .summary-item span,
+    .admin-summary .summary-item strong {
+        margin-left: 0;
+    }
+
+    .admin-summary .summary-item::before {
+        display: none;
+    }
+
+    .admin-summary .summary-item strong {
+        font-size: 16px;
+    }
+
+    .admin-section {
+        padding: 16px 10px;
+    }
+
+    .admin-calendar-day {
+        min-height: 84px;
+        padding: 6px 4px;
+    }
+
+    .admin-calendar-day span {
+        padding: 4px 3px;
+        font-size: 7px;
+    }
+
+    .admin-calendar-day span em {
+        font-size: 7px;
+    }
+
+    .member-table {
+        min-width: 570px;
+    }
+
+    .member-table-wrap {
+        overflow-x: auto;
+    }
+}
+
+/* 💡 추가할 네비게이션바 레이아웃용 스타일 */
+.admin-tabs {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.admin-tabs-left {
+    display: flex;
+    gap: 10px;
+}

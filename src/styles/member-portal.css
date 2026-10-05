@@ -1,0 +1,370 @@
+/* member-portal.css — 회원(비관리자) 화면 및 기본 달력 위젯
+   * 기본 .calendar 계열은 관리자 화면(admin.css)에서 덧씌워 재사용하므로
+     반드시 admin.css 보다 먼저 불러와야 합니다. */
+
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 7px;
+}
+
+.week-day {
+    min-height: 82px;
+    padding: 10px 8px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: #b4adb0;
+    text-align: center;
+}
+
+.week-day b {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.week-day.has-lesson {
+    border-color: #e7bdc9;
+    background: var(--blush);
+}
+
+.week-day.has-lesson b {
+    color: var(--wine);
+}
+
+.week-day span {
+    display: block;
+    margin-top: 13px;
+    color: var(--wine);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+.week-day em {
+    font-style: normal;
+    font-weight: 800;
+}
+
+.admin-week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(90px, 1fr));
+    gap: 5px;
+    min-width: 650px;
+}
+
+.admin-week-day {
+    min-height: 135px;
+    padding: 10px 7px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: #b4adb0;
+    background: #fff;
+}
+
+.admin-week-day>b {
+    display: block;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.admin-week-day.has-lesson {
+    border-color: #e7bdc9;
+    background: var(--blush);
+}
+
+.admin-week-day.has-lesson>b {
+    color: var(--wine);
+}
+
+.admin-week-day span {
+    display: block;
+    margin-top: 8px;
+    padding: 6px 4px;
+    border-radius: 3px;
+    color: var(--wine);
+    background: white;
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.schedule-mode {
+    display: flex;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: #fbf8f9;
+}
+
+.schedule-mode button {
+    min-width: 38px;
+    border: 0;
+    border-radius: 3px;
+    padding: 6px 9px;
+    color: var(--muted);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.schedule-mode button.active {
+    color: white;
+    background: var(--wine);
+}
+
+.schedule-filter {
+    margin: 0 0 14px;
+}
+
+.schedule-filter select {
+    width: 100%;
+    height: 37px;
+    padding: 0 10px;
+    border: 1px solid #d9d1d4;
+    border-radius: 5px;
+    color: var(--ink);
+    background: white;
+    font-size: 12px;
+}
+
+.month-list {
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.month-list-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 13px 14px;
+    color: var(--muted);
+    background: #fcf8f9;
+    font-size: 12px;
+}
+
+.month-list-header b {
+    color: var(--wine);
+}
+
+.month-lesson {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+}
+
+.month-lesson strong {
+    color: var(--wine);
+}
+
+.month-lesson span {
+    color: var(--muted);
+}
+
+/* 기본 달력 위젯 (관리자 달력이 상속·재정의) */
+.calendar {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+}
+
+.calendar-title {
+    padding: 13px 14px;
+    color: var(--wine);
+    background: #fcf8f9;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(90px, 1fr));
+    min-width: 650px;
+}
+
+.calendar-weekdays b {
+    padding: 10px 5px;
+    color: var(--muted);
+    background: #faf8f8;
+    font-size: 11px;
+    text-align: center;
+}
+
+.calendar-grid {
+    border-top: 1px solid var(--line);
+}
+
+.calendar-day {
+    min-height: 92px;
+    padding: 7px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: white;
+}
+
+.calendar-day:nth-child(7n) {
+    border-right: 0;
+}
+
+.calendar-day strong {
+    display: block;
+    color: var(--ink);
+    font-size: 11px;
+}
+
+.calendar-day.outside strong {
+    color: #c8c2c4;
+}
+
+.calendar-day span {
+    display: block;
+    margin-top: 5px;
+    padding: 4px;
+    border-radius: 3px;
+    color: var(--wine);
+    background: var(--blush);
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.member-calendar {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+}
+
+.member-calendar .calendar-grid,
+.member-calendar .calendar-weekdays {
+    min-width: 610px;
+}
+
+.member-calendar .calendar-day {
+    min-height: 86px;
+}
+
+.member-calendar .member-lesson-day {
+    background: var(--blush);
+}
+
+.member-calendar .member-lesson-day strong {
+    color: var(--wine);
+}
+
+.member-view {
+    max-width: 740px;
+    margin: 0 auto;
+}
+
+.member-intro {
+    margin-bottom: 22px;
+}
+
+.lesson-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 20px 22px;
+    border-radius: 8px;
+    color: white;
+    background: var(--wine);
+}
+
+.lesson-card strong,
+.lesson-card small {
+    display: block;
+}
+
+.lesson-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #ffc9d5;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .1em;
+}
+
+.lesson-card strong {
+    font-size: 21px;
+}
+
+.lesson-card small {
+    margin-top: 7px;
+    color: #f7dce2;
+    font-size: 12px;
+}
+
+.lesson-badge {
+    padding: 7px 9px;
+    border-radius: 4px;
+    color: var(--wine);
+    background: white;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.attendance-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    margin: 18px 0;
+}
+
+.attendance-button {
+    display: grid;
+    justify-items: start;
+    gap: 5px;
+    min-height: 128px;
+    padding: 20px;
+    border: 1px solid #edc8d0;
+    border-radius: 8px;
+    background: var(--blush);
+    text-align: left;
+}
+
+.attendance-button>span {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 3px;
+    border-radius: 50%;
+    color: white;
+    background: var(--wine);
+    font-size: 19px;
+}
+
+.attendance-button strong {
+    color: var(--wine);
+    font-size: 18px;
+}
+
+.attendance-button small {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.attendance-button:hover:not(:disabled),
+.attendance-button.selected {
+    border-color: var(--wine);
+    box-shadow: 0 6px 14px #91002f16;
+}
+
+.attendance-button:disabled {
+    cursor: default;
+    opacity: .46;
+}
+
+.attendance-button.selected {
+    opacity: 1;
+}
+
+.schedule-panel {
+    margin-top: 22px;
+}

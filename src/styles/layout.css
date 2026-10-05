@@ -1,0 +1,105 @@
+/* layout.css — 앱 전체 틀: 바깥 배경, 창, 상단 헤더, 하단 푸터 */
+
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: clamp(8px, 2.5vw, 30px) clamp(8px, 2vw, 20px);
+    background: radial-gradient(circle at 8% 0%, #fff 0, #f2f3f5 43%);
+    color: var(--ink);
+}
+
+.app-window {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    max-width: 100%;
+    margin: auto;
+    overflow: hidden;
+    border: 1px solid #dddfe2;
+    border-radius: 10px;
+    background: white;
+    box-shadow: 0 15px 35px #271d2420;
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 75px;
+    padding: 0 28px;
+    color: white;
+    background: var(--wine);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    color: white;
+    background: transparent;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-weight: 700;
+    font-size: 21px;
+    letter-spacing: 0;
+}
+
+.brand-mark {
+    color: var(--gold);
+    font-size: 20px;
+}
+
+.home-label {
+    border: 0;
+    color: #fff;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.preview-nav {
+    display: flex;
+    gap: 5px;
+}
+
+.preview-nav button {
+    border: 1px solid #ffffff45;
+    border-radius: 4px;
+    padding: 7px 10px;
+    color: #fff9fa;
+    background: transparent;
+    font-size: 11px;
+}
+
+.preview-nav button.active,
+.preview-nav button:hover {
+    background: #fff;
+    color: var(--wine);
+}
+
+.app-content {
+    flex: 1;
+    padding: clamp(24px, 6vw, 78px) clamp(16px, 4vw, 44px) clamp(24px, 5vw, 65px);
+}
+
+/* 헤더 오른쪽 액션(사용설명서/홈으로) */
+.app-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.app-footer {
+    padding: 17px;
+    border-top: 1px solid var(--line);
+    color: #9a9197;
+    background: #fbfbfb;
+    text-align: center;
+    font-size: 12px;
+}
+
+.app-footer span {
+    color: var(--wine);
+}

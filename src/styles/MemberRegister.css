@@ -1,0 +1,280 @@
+/* --- 회원 등록/상세 모달 고유 스타일 --- */
+.member-register-modal {
+    background-color: #fff;
+    width: 540px;
+    max-width: 90vw;
+    height: auto;
+    /* 고정 높이 대신 내용에 맞게 자동 조절 */
+    max-height: none;
+    /* 최대 높이 제한 해제 (스크롤바 제거) */
+    overflow-y: visible;
+    /* 스크롤바 숨김/제거 */
+    border-radius: 12px;
+    /* 4개 모서리 모두 둥글게 */
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    /* 모서리가 둥근 테두리 밖으로 콘텐츠가 튀어나가지 않도록 처리 */
+}
+
+/* 모달 헤더 여백 줄이기 */
+.member-register-modal .modal-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid #eee;
+    cursor: move;
+    user-select: none;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.member-register-modal .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+}
+
+/* 필드 그리드 간격 좁히기 */
+.member-register-modal .detail-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+    /* 행 간격을 10px로 축소 */
+    padding: 16px 20px;
+}
+
+.member-register-modal .detail-form>.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    /* 라벨과 입력창 사이 간격 축소 */
+}
+
+/* 전체 폭을 쓰도록 강제 설정 */
+.member-register-modal .detail-form>.full-width,
+.member-register-modal .member-schedule-container {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+}
+
+.member-register-modal .detail-form .field span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #444;
+}
+
+.member-register-modal .detail-form input[type="text"],
+.member-register-modal .detail-form input[type="date"],
+.member-register-modal .detail-form select {
+    width: 100% !important;
+    padding: 7px 10px !important;
+    /* 입력창 내부 패딩 축소 */
+    font-size: 13px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    box-sizing: border-box !important;
+    background-color: #fff !important;
+    outline: none !important;
+}
+
+.member-register-modal .detail-form input:focus,
+.member-register-modal .detail-form select:focus {
+    border-color: #900020 !important;
+}
+
+/* --- 레슨 일정 섹션 스타일 --- */
+.member-register-modal .schedule-section {
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.member-register-modal .member-schedule-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+    width: 100% !important;
+}
+
+.member-register-modal .schedule-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #444;
+    white-space: nowrap;
+    /* 타이틀 줄바꿈 방지 */
+}
+
+/* 시작일 및 버튼 컨트롤 그룹 */
+.member-register-modal .schedule-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.member-register-modal .start-date-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.member-register-modal .start-date-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    white-space: nowrap;
+    /* '시작일:' 글자가 두 줄로 쪼개지는 현상 방지 */
+}
+
+.member-register-modal .start-date-input {
+    padding: 5px 8px;
+    font-size: 13px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    outline: none;
+    background-color: #fff;
+}
+
+.member-register-modal .start-date-input:focus {
+    border-color: #900020;
+}
+
+.member-register-modal .member-add-btn {
+    background-color: #555 !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+}
+
+.member-register-modal .member-add-btn:hover {
+    background-color: #444 !important;
+}
+
+/* 일정 행 정렬 */
+.member-register-modal .member-schedule-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+    width: 100% !important;
+}
+
+.member-register-modal .member-schedule-row select {
+    flex: 1 1 0% !important;
+    width: auto !important;
+    padding: 10px 8px !important;
+    font-size: 14px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    background-color: #fff !important;
+}
+
+.member-register-modal .member-del-btn {
+    flex: 0 0 auto !important;
+    padding: 10px 12px !important;
+    background-color: #a94442 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+}
+
+.member-register-modal .member-del-btn:hover {
+    background-color: #8b3634 !important;
+}
+
+/* 모달 푸터 */
+.member-register-modal .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background-color: #f9f9f9;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.member-register-modal .modal-footer .btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.member-register-modal .btn-save {
+    background-color: #900020;
+    color: white;
+}
+
+.member-register-modal .btn-save:hover {
+    background-color: #7a001a;
+}
+
+.member-register-modal .btn-cancel {
+    background-color: white;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.member-register-modal .btn-cancel:hover {
+    background-color: #f0f0f0;
+}
+
+/* 경고 알림창 */
+.member-register-alert-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    border-radius: 8px;
+}
+
+.member-register-alert-box {
+    background-color: #fff;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    width: 320px;
+    text-align: center;
+}
+
+.member-register-alert-box p {
+    margin: 0 0 20px 0;
+    font-size: 15px;
+    color: #333;
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.member-register-alert-box button {
+    background-color: #900020;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}

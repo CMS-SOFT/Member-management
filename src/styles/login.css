@@ -1,0 +1,167 @@
+/* login.css — 로그인 화면 전용 (요청에 따라 문구/스타일 변경 금지) */
+
+/* 로그인 화면일 때 콘텐츠 영역을 세로로 채워, 창 높이에 맞게 가운데 정렬 */
+.app-content:has(.login-view) {
+    display: flex;
+    flex-direction: column;
+}
+
+.login-view {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.login-intro {
+    padding: 0;
+}
+
+.login-intro h1 {
+    margin: 0;
+    line-height: 1;
+}
+
+/* 로그인 입력창을 조금 더 크게 + 카드 안 위쪽 빈 여백 제거 */
+.login-card .field {
+    margin-top: 0;
+}
+
+.login-view .field input {
+    height: 52px;
+    font-size: 14px;
+}
+
+.login-intro h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-weight: 700;
+    font-size: clamp(28px, 4.5vw, 38px);
+}
+
+.login-intro p,
+.member-intro p {
+    margin-top: 9px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.login-card {
+    margin-top: 12px;
+    padding: 22px 30px;
+    border: 1px solid #ead7db;
+    border-radius: 10px;
+    background: #fffafb;
+    text-align: left;
+}
+
+.card-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+}
+
+.card-heading h2 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.card-heading p {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.hint {
+    margin-top: 11px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.hint b {
+    color: var(--wine);
+}
+
+.login-button {
+    width: 100%;
+    height: 52px;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.admin-link {
+    margin-top: 21px;
+    border: 0;
+    color: var(--wine);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.admin-link span {
+    margin-left: 5px;
+    color: #bd8e9b;
+}
+
+.form-error {
+    margin-top: 10px;
+    color: #a43750;
+    font-size: 12px;
+}
+
+.login-error-modal .primary-button {
+    min-width: 110px;
+    height: 39px;
+    margin-top: 22px;
+}
+
+/* 화면이 좁아지면 로그인 요소도 함께 작아지도록 */
+@media (max-width: 700px) {
+    .login-intro {
+        padding: 0 0 14px;
+    }
+
+    .login-intro h1 {
+        font-size: 30px;
+    }
+
+    .login-card {
+        margin-top: 14px;
+        padding: 20px 18px;
+    }
+
+    .login-view .field input {
+        height: 46px;
+        font-size: 13px;
+    }
+
+    .login-button {
+        height: 46px;
+        margin-top: 16px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 420px) {
+    .login-intro h1 {
+        font-size: 25px;
+    }
+
+    .login-card {
+        padding: 16px 14px;
+    }
+
+    .login-view .field input {
+        height: 42px;
+    }
+
+    .login-button {
+        height: 42px;
+    }
+}

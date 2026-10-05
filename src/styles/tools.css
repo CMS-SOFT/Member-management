@@ -1,0 +1,167 @@
+/* tools.css — 자료 관리 드롭다운, 각진 사각형 버튼, 버튼 공통 각짐 처리 */
+
+/* 인사말 라인 오른쪽 액션(자료 관리) */
+.page-title-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 자료 관리 드롭다운 */
+.csv-tools {
+    position: relative;
+}
+
+.csv-button {
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid #d9c3ca;
+    border-radius: 0;
+    color: var(--wine);
+    background: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.csv-button:hover {
+    background: #fff5f7;
+    border-color: var(--wine);
+}
+
+.csv-menu {
+    position: absolute;
+    top: 36px;
+    right: 0;
+    left: auto;
+    z-index: 30;
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    width: max-content;
+    min-width: 320px;
+    border: 1px solid #e6d7dc;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 10px 30px #00000022;
+}
+
+.csv-menu-row {
+    display: grid;
+    grid-template-columns: 64px repeat(3, 72px);
+    align-items: center;
+    gap: 8px;
+}
+
+.csv-menu-row+.csv-menu-row {
+    margin-top: 8px;
+}
+
+.csv-menu-row b {
+    font-size: 11px;
+    color: var(--wine);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.csv-menu-row button {
+    height: 30px;
+    border: 1px solid #d9c3ca;
+    border-radius: 0;
+    background: #fff;
+    color: #443;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.csv-menu-row button:hover {
+    border-color: var(--wine);
+    background: #fff5f7;
+    color: var(--wine);
+}
+
+.csv-menu-row--archive {
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+.csv-menu-row .csv-danger {
+    border-color: #a43750;
+    color: #a43750;
+}
+
+.csv-menu-row .csv-danger:hover {
+    background: #fff1f4;
+}
+
+/* 각진 사각형 버튼(보색 딥그린은 기본, 위험은 자주) */
+.square-button {
+    height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--wine);
+    border-radius: 0;
+    background: #fff;
+    color: var(--wine);
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.square-button:hover:not(:disabled) {
+    background: var(--blush);
+}
+
+.square-button:disabled {
+    border-color: #d8d0d3;
+    color: #a49aa0;
+    background: #f4f0f2;
+    cursor: default;
+}
+
+.square-button.primary {
+    border-color: var(--green);
+    background: var(--green);
+    color: #fff;
+}
+
+.square-button.primary:hover:not(:disabled) {
+    background: #0f6b4b;
+}
+
+/* 와인색 채움 버튼(추가 등 주요 동작) — 틀과 같은 색 */
+.square-button.solid {
+    border-color: var(--wine);
+    background: var(--wine);
+    color: #fff;
+}
+
+.square-button.solid:hover:not(:disabled) {
+    background: #75001f;
+}
+
+/* 삭제 버튼도 와인색 계열로 통일(아웃라인) */
+.square-button.danger {
+    border-color: var(--wine);
+    color: var(--wine);
+    background: #fff;
+}
+
+.square-button.danger:hover:not(:disabled) {
+    background: var(--blush);
+}
+
+/* 주요 버튼 각진 처리(테마 색 유지) */
+.primary-button,
+.add-button,
+.csv-button,
+.delete-button,
+.cancel-button,
+.modal-add-button {
+    border-radius: 0 !important;
+}

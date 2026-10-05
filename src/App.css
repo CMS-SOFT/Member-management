@@ -1,0 +1,27 @@
+/* App.css — 진입점.
+   실제 스타일은 styles/ 폴더에 기능별로 나눠 두었습니다.
+   불러오는 순서(cascade)가 중요하니 아래 순서를 유지하세요.
+
+   base         : 색상 변수, 리셋, 공통 글자/프리미티브
+   layout       : 앱 전체 틀(헤더/푸터/창)
+   login        : 로그인 화면 (수정 금지)
+   common       : 공용 제목줄/요약카드/표/상태배지
+   member-portal: 회원 화면 + 기본 달력 위젯(관리자 달력이 상속)
+   admin        : 관리자 대시보드(달력은 member-portal 뒤에 와야 함)
+   schedule     : 스케줄 팝업/목록/리스트보기/일정 수정창
+   member       : 이용권/재등록
+   modal        : 팝업 공통(배경/확인창/상세창/알림/지난기록)
+   tools        : 자료 관리 드롭다운, 각진 버튼
+   responsive   : 화면 크기별 조정 (항상 마지막) */
+
+@import './styles/base.css';
+@import './styles/layout.css';
+@import './styles/login.css';
+@import './styles/common.css';
+@import './styles/member-portal.css';
+@import './styles/admin.css';
+@import './styles/schedule.css';
+@import './styles/member.css';
+@import './styles/modal.css';
+@import './styles/tools.css';
+@import './styles/responsive.css';

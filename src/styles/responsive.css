@@ -1,0 +1,157 @@
+/* responsive.css — 화면 크기별 조정(태블릿/모바일).
+   * 관리자 화면 전용 반응형은 admin.css 맨 아래에 함께 둡니다. */
+
+@media (max-width: 900px) {
+    .app-content {
+        padding: 86px 28px 65px;
+    }
+
+    .login-intro {
+        padding: 18px 0 52px;
+    }
+}
+
+@media (max-width: 700px) {
+    .app-shell {
+        padding: 0;
+    }
+
+    .app-window {
+        min-height: 100vh;
+        border: 0;
+        border-radius: 0;
+    }
+
+    .app-header {
+        min-height: 66px;
+        padding: 0 16px;
+    }
+
+    .brand {
+        font-size: 17px;
+    }
+
+    .preview-nav button {
+        padding: 6px 7px;
+        font-size: 10px;
+    }
+
+    .app-content {
+        padding: 76px 16px 48px;
+    }
+
+    .login-intro {
+        padding: 10px 0 48px;
+    }
+
+    .login-card {
+        margin-top: 16px;
+        padding: 23px 18px;
+    }
+
+    .page-title {
+        align-items: start;
+        flex-direction: column;
+        gap: 13px;
+    }
+
+    .summary-grid {
+        gap: 7px;
+    }
+
+    .summary-item {
+        padding: 11px 9px;
+    }
+
+    .summary-item strong {
+        font-size: 17px;
+    }
+
+    .panel {
+        padding: 15px 12px;
+    }
+
+    .section-heading {
+        align-items: start;
+        flex-direction: column;
+        gap: 7px;
+    }
+
+    .week-grid {
+        gap: 4px;
+    }
+
+    .week-day {
+        min-height: 70px;
+        padding: 8px 2px;
+    }
+
+    .week-day span {
+        margin-top: 10px;
+        font-size: 9px;
+    }
+
+    .lesson-card {
+        align-items: start;
+        flex-direction: column;
+    }
+
+    .attendance-grid {
+        gap: 8px;
+    }
+
+    .attendance-button {
+        padding: 14px;
+    }
+
+    .attendance-button strong {
+        font-size: 16px;
+    }
+
+    .schedule-mode {
+        align-self: stretch;
+    }
+
+    .schedule-mode button {
+        flex: 1;
+    }
+}
+
+/* 모바일(APK/WebView) 터치 최적화 */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+button,
+.square-button,
+.csv-button,
+.primary-button,
+.cancel-button,
+.delete-button,
+.add-button {
+    touch-action: manipulation;
+}
+
+.app-shell {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (max-width: 700px) {
+    .editor-panel {
+        right: 12px;
+    }
+
+    .modal-backdrop {
+        padding: 12px;
+    }
+
+    .schedule-modal,
+    .detail-modal,
+    .manual-modal,
+    .archive-viewer,
+    .reregister-modal {
+        max-height: 88vh;
+        overflow-y: auto;
+    }
+}

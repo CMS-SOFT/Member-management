@@ -1,0 +1,553 @@
+/* schedule.css — 스케줄 화면/팝업: 오늘 레슨, 일정 팝업, 일정 목록, 리스트보기, 일정 수정창 */
+
+.today-lessons {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 15px;
+    padding: 12px 14px;
+    border: 1px solid #f0dce1;
+    border-radius: 6px;
+    background: #fffafb;
+}
+
+.today-lessons>div:first-child {
+    display: grid;
+    gap: 5px;
+    flex: 0 0 auto;
+}
+
+.today-lessons>div:first-child strong {
+    color: #2d272b;
+    font-size: 11px;
+}
+
+.today-lessons>p {
+    margin-left: auto;
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.today-lesson-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: end;
+    gap: 6px;
+}
+
+.today-lesson-list button {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    padding: 7px 9px;
+    border: 1px solid #edc8d0;
+    border-radius: 4px;
+    color: #332b30;
+    background: white;
+    font-size: 10px;
+}
+
+.today-lesson-list button:hover {
+    border-color: var(--wine);
+    background: #fff1f4;
+}
+
+.today-lesson-list span {
+    color: var(--wine);
+    font-weight: 800;
+}
+
+.today-lesson-list button.completed {
+    border-color: #ded9dc;
+    color: #8d878a;
+    background: #f4f1f2;
+    cursor: default;
+}
+
+.today-lesson-list button.completed span {
+    color: #8d878a;
+}
+
+.today-lesson-list button.completed:hover {
+    border-color: #ded9dc;
+    background: #f4f1f2;
+}
+
+/* 오늘 레슨 위젯 (헤더/빈 상태) */
+.today-lessons-head {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 8px;
+}
+
+.today-lesson-empty {
+    padding: 8px 2px;
+    color: #9a9197;
+    font-size: 12px;
+}
+
+/* 일정 팝업(모달) */
+.schedule-modal {
+    position: relative;
+    width: min(500px, calc(100vw - 24px));
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: 22px 20px 20px;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: 0 18px 45px #0003;
+}
+
+.schedule-modal .modal-close {
+    position: absolute;
+    top: 15px;
+    right: 14px;
+    border: 0;
+    color: #999195;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.schedule-modal h3 {
+    margin: 5px 0 15px;
+    color: #2a2529;
+    font-size: 18px;
+}
+
+.modal-add-button {
+    width: 100%;
+    height: 28px;
+    margin-bottom: 10px;
+}
+
+.lesson-list {
+    display: grid;
+    gap: 5px;
+}
+
+.empty-lessons {
+    padding: 16px;
+    color: #9a9197;
+    text-align: center;
+    font-size: 10px;
+}
+
+.member-schedule-modal {
+    width: min(620px, 100%);
+}
+
+.member-modal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 8px 0 12px;
+}
+
+.member-modal-month {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    color: var(--wine);
+    font-size: 11px;
+}
+
+.member-modal-month button {
+    border: 0;
+    color: var(--wine);
+    background: transparent;
+    font-size: 19px;
+}
+
+.schedule-view-toggle {
+    display: flex;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: #fbf8f9;
+}
+
+.schedule-view-toggle button {
+    border: 0;
+    border-radius: 3px;
+    padding: 5px 9px;
+    color: var(--muted);
+    background: transparent;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.schedule-view-toggle button.active {
+    color: #fff;
+    background: var(--wine);
+}
+
+.member-schedule-modal .admin-calendar {
+    border: 1px solid #eee5e8;
+}
+
+.member-schedule-modal .admin-calendar-day {
+    min-height: 76px;
+}
+
+.member-modal-list {
+    display: grid;
+    gap: 5px;
+    margin-top: 12px;
+}
+
+.member-modal-list button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border: 1px solid #eee5e8;
+    border-radius: 4px;
+    color: #332b30;
+    background: white;
+    font-size: 10px;
+    text-align: left;
+}
+
+.member-modal-list button:hover {
+    border-color: var(--wine);
+    background: #fffafb;
+}
+
+.member-modal-list span {
+    color: var(--wine);
+    font-weight: 800;
+}
+
+.member-modal-list strong {
+    font-weight: 800;
+}
+
+.member-modal-list i {
+    margin-left: auto;
+    color: #c88916;
+    font-size: 9px;
+    font-style: normal;
+}
+
+.member-modal-list--all {
+    max-height: 390px;
+    overflow-y: auto;
+}
+
+/* 일정 수정창(에디터) */
+.editor-modal {
+    width: min(340px, 100%);
+}
+
+.editor-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 10px;
+    padding: 12px 11px;
+    border: 1px solid #f0dbe0;
+    border-radius: 7px;
+    background: #fffafb;
+}
+
+.editor-card label {
+    display: grid;
+    gap: 4px;
+    color: #6f666b;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+.editor-card input,
+.editor-card select {
+    width: 100%;
+    height: 29px;
+    padding: 0 7px;
+    border: 1px solid #ded4d8;
+    border-radius: 4px;
+    color: #322c30;
+    background: #fff;
+    font-size: 10px;
+}
+
+.editor-note {
+    grid-column: 1 / -1;
+}
+
+.editor-pass {
+    height: 29px;
+    display: flex;
+    align-items: center;
+    padding: 0 9px;
+    border: 1px solid #ded4d8;
+    border-radius: 4px;
+    background: #fff;
+    color: var(--wine);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.editor-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: end;
+    gap: 6px;
+    margin-top: 2px;
+}
+
+.editor-actions button {
+    height: 27px;
+    padding: 0 12px;
+    border: 1px solid #e5dfe1;
+    border-radius: 4px;
+    color: #6e6569;
+    background: #fff;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.editor-actions button:last-child {
+    border-color: var(--wine);
+    color: #fff;
+    background: var(--wine);
+}
+
+/* 스케줄 헤더/컨트롤: [회원필터] [연월 중앙] [보기 select] 한 줄 */
+.schedule-controls {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 16px;
+}
+
+.schedule-controls .schedule-member-filter {
+    justify-self: start;
+}
+
+.schedule-controls .month-switcher {
+    justify-self: center;
+}
+
+.schedule-controls .schedule-view-select {
+    justify-self: end;
+}
+
+.schedule-member-filter {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid #d9c3ca;
+    border-radius: 0;
+    background: #fff;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 150px;
+}
+
+.schedule-view-select {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid #d9c3ca;
+    border-radius: 0;
+    background: #fff;
+    color: var(--wine);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* 리스트 보기 */
+.schedule-listview {
+    display: grid;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.schedule-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #eee5e8;
+    border-radius: 7px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+}
+
+.schedule-list-item:hover {
+    border-color: var(--wine);
+    background: #fffafb;
+}
+
+.schedule-list-item b {
+    min-width: 46px;
+    color: var(--wine);
+    font-weight: 800;
+}
+
+.schedule-list-item span {
+    min-width: 48px;
+    color: var(--muted);
+}
+
+.schedule-list-item strong {
+    font-weight: 800;
+}
+
+.schedule-list-item .pass-count {
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #f0dbe0;
+    color: var(--wine);
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.schedule-list-item i {
+    margin-left: auto;
+    font-style: normal;
+    font-weight: 700;
+    color: #c88916;
+}
+
+/* 회원 스케줄 추가 폼 (날짜 팝업) — 회원/시간/추가 한 줄 */
+.add-lesson-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin: 6px 0 12px;
+    flex-wrap: nowrap;
+}
+
+.add-lesson-form label {
+    flex: 1;
+    display: grid;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #6f666b;
+    min-width: 0;
+}
+
+.add-lesson-form select {
+    width: 100%;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid #d9d1d4;
+    border-radius: 0;
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 0;
+}
+
+.add-lesson-form .square-button {
+    flex: 0 0 auto;
+}
+
+/* 모달 드래그 핸들 */
+.modal-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: -4px -4px 8px;
+    padding: 6px 4px;
+    border-radius: 6px;
+    user-select: none;
+}
+
+.modal-drag-handle:hover {
+    background: #faf3f5;
+}
+
+.modal-drag-handle .modal-close {
+    position: static;
+}
+
+/* 일정 팝업: 제목 아래 액션 라인 + 시작/종료 버튼 */
+.editor-actions--top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin: 4px 0 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+}
+
+.editor-actions--top>div {
+    display: flex;
+    gap: 6px;
+}
+
+.lesson-run-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.lesson-run-actions button {
+    flex: 1;
+    height: 34px;
+    border-radius: 0;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.lesson-run-actions .run-start {
+    border: 1px solid #1f9d55;
+    background: #1f9d55;
+    color: #fff;
+}
+
+.lesson-run-actions .run-finish {
+    border: 1px solid var(--wine);
+    background: var(--wine);
+    color: #fff;
+}
+
+.lesson-run-actions button:disabled {
+    border-color: #d8d0d3;
+    background: #eee9eb;
+    color: #a49aa0;
+    cursor: default;
+}
+
+.lesson-future-note {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+    color: #9a7a20;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* 일정 수정 도킹 패널 */
+.editor-dock {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    pointer-events: none;
+}
+
+.editor-panel {
+    pointer-events: auto;
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    left: auto;
+    width: min(340px, calc(100vw - 48px));
+    max-height: 82vh;
+    overflow-y: auto;
+    box-shadow: -10px 0 40px #00000026;
+}

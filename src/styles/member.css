@@ -1,0 +1,183 @@
+/* member.css — 회원 관리: 이용권 표시/추가, 재등록 버튼, 재등록 팝업 */
+
+/* 회원 목록 이용권 셀 + 재등록 버튼 */
+.pass-count-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: var(--wine);
+}
+
+.pass-count-cell.done {
+    color: #6f666b;
+}
+
+.renotify-button {
+    padding: 5px 14px;
+    border: 1px solid var(--wine);
+    border-radius: 0;
+    background: var(--wine);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+    height: auto;
+}
+
+.renotify-button:hover {
+    opacity: .9;
+}
+
+/* 회원 상세 이용권 섹션 */
+.pass-section {
+    margin-top: 8px;
+    padding: 14px 16px;
+    border: 1px solid #eee0e4;
+    border-radius: 8px;
+    background: #fdf9fa;
+}
+
+.pass-section-head {
+    margin-bottom: 8px;
+}
+
+.pass-list {
+    display: grid;
+    gap: 6px;
+}
+
+.pass-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid #eee0e4;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 12px;
+}
+
+.pass-row.done {
+    opacity: .6;
+}
+
+.pass-row b {
+    color: var(--wine);
+    font-weight: 800;
+}
+
+.pass-row span {
+    color: var(--muted);
+}
+
+.pass-row i {
+    margin-left: auto;
+    font-style: normal;
+    font-weight: 700;
+    color: #c88916;
+}
+
+.pass-row.done i {
+    color: #6f666b;
+}
+
+.pass-del {
+    width: 22px;
+    height: 22px;
+    border: 1px solid #e5bfc8;
+    border-radius: 5px;
+    background: #fff7f8;
+    color: #a43750;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.pass-empty {
+    padding: 8px;
+    color: #9a9197;
+    text-align: center;
+    font-size: 11px;
+}
+
+.pass-add {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.pass-add label {
+    display: grid;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #6f666b;
+}
+
+.pass-add input {
+    width: 90px;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid #d9d1d4;
+    border-radius: 0;
+    font-size: 12px;
+}
+
+.pass-add .primary-button {
+    height: 34px;
+}
+
+/* 재등록 팝업 */
+.reregister-modal {
+    width: min(420px, 100%);
+}
+
+.reregister-body {
+    display: grid;
+    gap: 14px;
+    margin: 4px 0 14px;
+}
+
+.reregister-slots {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid #eee0e4;
+    border-radius: 8px;
+    background: #fdf9fa;
+}
+
+.reregister-slots-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 800;
+    color: #6f666b;
+}
+
+.reregister-slot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.reregister-slot select {
+    flex: 1;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid #d9d1d4;
+    border-radius: 0;
+    font-size: 13px;
+}
+
+.reregister-preview {
+    font-size: 12px;
+    color: #6f666b;
+}
+
+.reregister-preview b {
+    color: var(--wine);
+}
