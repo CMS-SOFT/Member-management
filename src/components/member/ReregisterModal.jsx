@@ -1,15 +1,20 @@
 import { useState } from 'react';
-import { timeOptions, weekdayOptions, generateRecurringLessons } from '../../lib/sheet';
+import { hourOptions, minuteOptions, weekdayOptions, generateRecurringLessons } from '../../lib/sheet';
 import { Backdrop } from '../common';
 
 // 재등록 팝업: 새 이용권(총 횟수)과 반복 요일/시간을 정하면 향후 일정을 자동 생성합니다.
 export function ReregisterModal({ member, onClose, onSubmit }) {
   const [total, setTotal] = useState('8');
   const [slots, setSlots] = useState([{ weekday: 1, time: '18:00' }]);
-  const today = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const updateSlot = (index, key, value) => {
     setSlots((current) => current.map((slot, i) => i === index ? { ...slot, [key]: key === 'weekday' ? Number(value) : value } : slot));
+  };
+  const updateTimePart = (index, part, value) => {
+    const [hour, minute] = slots[index].time.split(':');
+    updateSlot(index, 'time', part === 'hour' ? `${value}:${minute}` : `${hour}:${value}`);
   };
   const addSlot = () => setSlots((current) => [...current, { weekday: 1, time: '18:00' }]);
   const removeSlot = (index) => setSlots((current) => current.filter((_, i) => i !== index));
@@ -19,7 +24,7 @@ export function ReregisterModal({ member, onClose, onSubmit }) {
 
   const submit = () => {
     if (count <= 0 || !preview.length) return;
-    onSubmit({ name: member.name, total: count, registeredAt: today, schedules: preview });
+    onSubmit({ memberId: member.id, name: member.name, total: count, registeredAt: today, schedules: preview });
   };
 
   return <Backdrop onClose={onClose}><div className="detail-modal reregister-modal">
@@ -34,8 +39,11 @@ export function ReregisterModal({ member, onClose, onSubmit }) {
             <select value={slot.weekday} onChange={(event) => updateSlot(index, 'weekday', event.target.value)}>
               {weekdayOptions.map((day) => <option key={day.value} value={day.value}>{day.label}요일</option>)}
             </select>
-            <select value={slot.time} onChange={(event) => updateSlot(index, 'time', event.target.value)}>
-              {timeOptions.map((time) => <option key={time} value={time}>{time}</option>)}
+            <select aria-label="시간" value={slot.time.split(':')[0]} onChange={(event) => updateTimePart(index, 'hour', event.target.value)}>
+              {hourOptions.map((hour) => <option key={hour} value={hour}>{hour}시</option>)}
+            </select>
+            <select aria-label="분" value={slot.time.split(':')[1]} onChange={(event) => updateTimePart(index, 'minute', event.target.value)}>
+              {minuteOptions.map((minute) => <option key={minute} value={minute}>{minute}분</option>)}
             </select>
             {slots.length > 1 && <button className="pass-del" onClick={() => removeSlot(index)}>✕</button>}
           </div>

@@ -15,11 +15,12 @@ function App() {
   const {
     directoryMembers,
     adminMembers,
-    adminHistories,
     adminSchedules,
     setAdminSchedules,
     adminPasses,
     setAdminPasses,
+    adminSettlements,
+    setAdminSettlements,
     isLoading,
     setIsLoading,
     loadError,
@@ -37,6 +38,11 @@ function App() {
       setLoginError('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+
+  // court mate 브랜드 버튼 — 로그인 상태면 현재 화면 유지, 아니면 홈으로
+  const goTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleLogin = (password = '') => {
@@ -81,7 +87,7 @@ function App() {
     <main className="app-shell">
       <section className="app-window">
         <header className="app-header">
-          <button className="brand" onClick={goHome}>
+          <button className="brand" onClick={goTop}>
             <span className="brand-mark">✦</span>
             <span>court mate</span>
           </button>
@@ -107,9 +113,10 @@ function App() {
               onSchedulesChange={setAdminSchedules}
               passes={adminPasses}
               onPassesChange={setAdminPasses}
+              settlements={adminSettlements}
+              onSettlementsChange={setAdminSettlements}
               apiRequest={callApi}
               sheetLoadError={loadError}
-              onRefresh={refreshAppData}
             />
           )}
         </div>

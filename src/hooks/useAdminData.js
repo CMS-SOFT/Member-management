@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react';
-import { requestBootstrap } from '../lib/bootstrapService';
+import { useState } from 'react';
+import { mergeSheetMembers } from '../lib/sheet';
 
 const isSameSchedule = (a, b) =>
   (a.id != null && String(a.id) === String(b.id)) ||
   (a.rowNumber != null && String(a.rowNumber) === String(b.rowNumber));
 
-export function useAdminData({ initialMembers, schedules, onSchedulesChange, passes, onPassesChange, apiRequest }) {
+export function useAdminData({
+  initialMembers,
+  schedules,
+  onSchedulesChange,
+  passes,
+  onPassesChange,
+  settlements,
+  onSettlementsChange,
+  apiRequest,
+}) {
   const [members, setMembers] = useState(initialMembers || []);
   const [selectedMember, setSelectedMember] = useState(null);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -26,6 +35,7 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
 
   const lessons = schedules || [];
   const passList = passes || [];
+  const settlementList = settlements || [];
 
   const passSummaryOf = (name, lessonDate, lessonTime) => {
     if (!name) return { used: 0, total: 4 };
@@ -98,8 +108,33 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
   };
 
   const deleteMember = async () => {
-    await apiRequest({ action: 'deleteMember', originalName: selectedMember.name, member: selectedMember });
-    setMembers((currentMembers) => currentMembers.filter((item) => item.name !== selectedMember.name));
+    // 1. 서버로 삭제 요청을 보내고 최신 데이터(result)를 받아옵니다.
+    const result = await apiRequest({
+      action: 'deleteMember',
+      originalName: selectedMember.name,
+      member: selectedMember
+    });
+
+    // 2. 서버가 반환한 최신 멤버 목록으로 상태를 확실하게 업데이트합니다.
+    if (result && result.members) {
+      setMembers(result.members);
+    } else {
+      // 만약 목록이 안 오면 기존 필터링 방식으로 보완
+      setMembers((currentMembers) => currentMembers.filter((item) => item.name !== selectedMember.name));
+    }
+
+    // 3. 연관된 스케줄이나 이용권 정보도 최신화가 필요하다면 함께 갱신
+    if (result && result.schedules) {
+      onSchedulesChange(result.schedules);
+    }
+    if (result && result.passes) {
+      onPassesChange(result.passes);
+    }
+    if (result && result.settlements) {
+      onSettlementsChange(result.settlements);
+    }
+
+    // 4. 모달 닫기 및 선택 해제
     setSelectedMember(null);
   };
 
@@ -113,7 +148,8 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
         gender: savedData.gender,
         level: savedData.level,
         lessonType: savedData.lessonType,
-        history: savedData.history,
+        status: savedData.status,
+        includePass: savedData.includePass,
         startDate: savedData.startDate,
         lessons: savedData.lessons
       }
@@ -126,7 +162,10 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
 
     if (response && response.success) {
       setIsRegisterOpen(false);
-      requestBootstrap();
+      // 서버가 반환한 최신 데이터로 상태를 직접 갱신 (화면 이동 없음)
+      if (response.members) setMembers(response.members);
+      if (response.schedules) onSchedulesChange(response.schedules);
+      if (response.passes) onPassesChange(response.passes);
       setCenterAlert('회원이 성공적으로 등록되었습니다.');
     } else if (response && (response.error || response.message)) {
       throw new Error(response.error || response.message);
@@ -138,11 +177,37 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
   const addPass = async (pass) => {
     const result = await apiRequest({ action: 'appendPass', pass });
     if (result.passes) onPassesChange(result.passes);
+    if (result.schedules) onSchedulesChange(result.schedules);
+    return result;
   };
 
   const removePass = async (pass) => {
     const result = await apiRequest({ action: 'deletePass', pass });
     if (result.passes) onPassesChange(result.passes);
+    if (result.schedules) onSchedulesChange(result.schedules);
+    return result;
+  };
+
+  const handleImported = async () => {
+    const fresh = await apiRequest({ action: 'bootstrap' });
+    setMembers(mergeSheetMembers(fresh.members || [], fresh.histories || []));
+    onSchedulesChange(fresh.schedules || []);
+    onPassesChange(fresh.passes || []);
+    onSettlementsChange(fresh.settlements || []);
+  };
+
+  const saveSettlement = async (settlement) => {
+    setSyncError('');
+    const fresh = await apiRequest({ action: 'saveSettlement', settlement });
+    onSettlementsChange(fresh.settlements || []);
+    return fresh;
+  };
+
+  const deleteSettlement = async (id) => {
+    setSyncError('');
+    const fresh = await apiRequest({ action: 'deleteSettlement', id });
+    onSettlementsChange(fresh.settlements || []);
+    return fresh;
   };
 
   const submitReregister = async (payload) => {
@@ -190,6 +255,7 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
       setMembers(fresh.members || []);
       onSchedulesChange(fresh.schedules || []);
       onPassesChange(fresh.passes || []);
+      onSettlementsChange(fresh.settlements || []);
       setIsClearDoneModal(true);
     } catch (error) {
       setSyncError(`자료를 지우지 못했어요. ${error.message || ''}`);
@@ -224,7 +290,7 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
   };
 
   return {
-    members, lessons, passList,
+    members, lessons, passList, settlementList,
     selectedMember, setSelectedMember,
     isRegisterOpen, setIsRegisterOpen,
     selectedDate, setSelectedDate,
@@ -243,7 +309,7 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
     filteredLessons, monthLessons, stats,
     passSummaryOf, memberPassSummary, canSchedule,
     updateMember, deleteMember, registerMember,
-    addPass, removePass, submitReregister,
+    addPass, removePass, handleImported, saveSettlement, deleteSettlement, submitReregister,
     saveSchedule, deleteSchedule,
     confirmClearData,
     moveMonth,

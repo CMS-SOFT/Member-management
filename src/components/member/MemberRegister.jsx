@@ -1,64 +1,33 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Backdrop } from '../common';
-import '../../styles/MemberRegister.css';
 
-export function MemberRegister({ isOpen, onClose, onSave, member }) {
-  const [form, setForm] = useState({
-    name: '',
-    birth: '',
-    phone: '',
-    gender: '남',
-    level: '중',
-    lessonType: '개인',
-    lessonStatus: '등록',
-    history: '이용중',
-    startDate: new Date().toISOString().split('T')[0]
-  });
+function createInitialForm(member) {
+  return {
+    name: member?.name || '',
+    birth: member?.birth || '',
+    phone: member?.phone || '',
+    gender: member?.gender || '남',
+    level: member?.level || '중',
+    lessonType: member?.lessonType || '개인',
+    status: member?.status || '등록',
+    startDate: member?.startDate || new Date().toISOString().split('T')[0],
+  };
+}
 
-  const [lessonSchedules, setLessonSchedules] = useState([
-    { dayOfWeek: '월요일', time: '10:00' }
-  ]);
+export function MemberRegister({ onClose, onSave, member }) {
+  const [form, setForm] = useState(() => createInitialForm(member));
+  const [lessonSchedules, setLessonSchedules] = useState(() =>
+    member?.lessons || member?.schedules || [{ dayOfWeek: '월요일', time: '10:00' }]
+  );
+  const [includePass, setIncludePass] = useState(form.status !== '탈퇴');
 
   const [centerAlert, setCenterAlert] = useState('');
   const birthInputRef = useRef(null);
   const phoneInputRef = useRef(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      const initialDate = member?.startDate || new Date().toISOString().split('T')[0];
-      if (member) {
-        setForm({
-          name: member.name || '',
-          birth: member.birth || '',
-          phone: member.phone || '',
-          gender: member.gender || '남',
-          level: member.level || '중',
-          lessonType: member.lessonType || '개인',
-          lessonStatus: member.lessonStatus || '등록',
-          history: member.history || '이용중',
-          startDate: initialDate
-        });
-        setLessonSchedules(member.lessons || member.schedules || [{ dayOfWeek: '월요일', time: '10:00' }]);
-      } else {
-        setForm({
-          name: '',
-          birth: '',
-          phone: '',
-          gender: '남',
-          level: '중',
-          lessonType: '개인',
-          lessonStatus: '등록',
-          history: '이용중',
-          startDate: initialDate
-        });
-        setLessonSchedules([{ dayOfWeek: '월요일', time: '10:00' }]);
-      }
-      setCenterAlert('');
-    }
-  }, [isOpen, member]);
-
   const modalBoxRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
@@ -67,6 +36,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
       return;
     }
     isDraggingRef.current = true;
+    setIsDragging(true);
     dragStartRef.current = {
       x: e.clientX - position.x,
       y: e.clientY - position.y
@@ -82,6 +52,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
 
     const handleMouseUp = () => {
       isDraggingRef.current = false;
+      setIsDragging(false);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -156,6 +127,9 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
       setForm((curr) => ({ ...curr, birth: newBirth }));
     } else {
       setForm((curr) => ({ ...curr, [name]: value }));
+      if (name === 'status' && value === '탈퇴') {
+        setIncludePass(false);
+      }
     }
   };
 
@@ -188,27 +162,32 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
       return;
     }
 
-    const lessonCheckSet = new Set();
-    for (const sch of lessonSchedules) {
-      const day = sch.dayOfWeek;
-      const time = sch.time;
-      const key = `${day}_${time}`;
+    if (includePass) {
+      const lessonCheckSet = new Set();
+      for (const sch of lessonSchedules) {
+        const day = sch.dayOfWeek;
+        const time = sch.time;
+        const key = `${day}_${time}`;
 
-      if (lessonCheckSet.has(key)) {
-        setCenterAlert('레슨일정이 중복되었습니다.');
-        return;
+        if (lessonCheckSet.has(key)) {
+          setCenterAlert('레슨일정이 중복되었습니다.');
+          return;
+        }
+        lessonCheckSet.add(key);
       }
-      lessonCheckSet.add(key);
     }
 
     if (onSave) {
-      const finalizedSchedules = lessonSchedules.map(sch => ({
-        ...sch,
-        date: calculateScheduleDate(form.startDate, sch.dayOfWeek)
-      }));
+      const finalizedSchedules = includePass
+        ? lessonSchedules.map(sch => ({
+          ...sch,
+          date: calculateScheduleDate(form.startDate, sch.dayOfWeek)
+        }))
+        : [];
 
       const savedData = {
         ...form,
+        includePass,
         lessons: finalizedSchedules,
         schedules: finalizedSchedules
       };
@@ -224,7 +203,7 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
         className="member-register-modal"
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
-          transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out',
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
         }}
       >
         {centerAlert && (
@@ -317,111 +296,129 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
 
           <div className="field">
             <span>회원 상태</span>
-            <select name="history" value={form.history} onChange={changeField}>
-              <option value="이용중">이용 중 (정상)</option>
-              <option value="만료됨">종료됨 (만료)</option>
+            <select name="status" value={form.status} onChange={changeField}>
+              <option value="등록">등록</option>
+              <option value="이용중">이용중</option>
+              <option value="탈퇴">탈퇴</option>
             </select>
           </div>
 
           {/* 레슨 일정 영역 */}
           <div className="full-width member-schedule-container schedule-section">
-            <div className="member-schedule-header">
-              <span className="schedule-title">레슨 일정 등록 (주 최대 4회)</span>
+            <label className="register-pass-option">
+              <input
+                type="checkbox"
+                checked={includePass}
+                disabled={form.status === '탈퇴'}
+                onChange={(event) => setIncludePass(event.target.checked)}
+              />
+              <span>정규 레슨 일정과 기본 이용권 함께 등록</span>
+            </label>
 
-              <div className="schedule-controls">
-                <div className="start-date-wrapper">
-                  <span className="start-date-label">시작일:</span>
-                  <input
-                    type="date"
-                    name="startDate"
-                    value={form.startDate}
-                    onChange={changeField}
-                    className="start-date-input"
-                  />
+            {includePass ? (
+              <>
+                <div className="member-schedule-header">
+                  <span className="schedule-title">레슨 일정 등록 (주 최대 4회)</span>
+
+                  <div className="schedule-controls">
+                    <div className="start-date-wrapper">
+                      <span className="start-date-label">시작일:</span>
+                      <input
+                        type="date"
+                        name="startDate"
+                        value={form.startDate}
+                        onChange={changeField}
+                        className="start-date-input"
+                      />
+                    </div>
+
+                    {lessonSchedules.length < 4 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (lessonSchedules.length >= 4) {
+                            setCenterAlert('레슨은 주 최대 4회까지 등록할 수 있습니다.');
+                            return;
+                          }
+                          setLessonSchedules([...lessonSchedules, { dayOfWeek: '수요일', time: '10:00' }]);
+                        }}
+                        className="member-add-btn"
+                      >
+                        + 일정 추가 ({lessonSchedules.length}/4)
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {lessonSchedules.length < 4 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (lessonSchedules.length >= 4) {
-                        setCenterAlert('레슨은 주 최대 4회까지 등록할 수 있습니다.');
-                        return;
-                      }
-                      setLessonSchedules([...lessonSchedules, { dayOfWeek: '수요일', time: '10:00' }]);
-                    }}
-                    className="member-add-btn"
-                  >
-                    + 일정 추가 ({lessonSchedules.length}/4)
-                  </button>
-                )}
-              </div>
-            </div>
+                {lessonSchedules.map((schedule, index) => (
+                  <div key={index} className="member-schedule-row">
+                    <select
+                      value={schedule.dayOfWeek}
+                      onChange={(e) => {
+                        const updated = [...lessonSchedules];
+                        updated[index].dayOfWeek = e.target.value;
+                        setLessonSchedules(updated);
+                      }}
+                    >
+                      <option value="월요일">월요일</option>
+                      <option value="화요일">화요일</option>
+                      <option value="수요일">수요일</option>
+                      <option value="목요일">목요일</option>
+                      <option value="금요일">금요일</option>
+                      <option value="토요일">토요일</option>
+                      <option value="일요일">일요일</option>
+                    </select>
 
-            {lessonSchedules.map((schedule, index) => (
-              <div key={index} className="member-schedule-row">
-                <select
-                  value={schedule.dayOfWeek}
-                  onChange={(e) => {
-                    const updated = [...lessonSchedules];
-                    updated[index].dayOfWeek = e.target.value;
-                    setLessonSchedules(updated);
-                  }}
-                >
-                  <option value="월요일">월요일</option>
-                  <option value="화요일">화요일</option>
-                  <option value="수요일">수요일</option>
-                  <option value="목요일">목요일</option>
-                  <option value="금요일">금요일</option>
-                  <option value="토요일">토요일</option>
-                  <option value="일요일">일요일</option>
-                </select>
+                    <select
+                      value={schedule.time ? schedule.time.split(':')[0] : '10'}
+                      onChange={(e) => {
+                        const hour = e.target.value;
+                        const minute = schedule.time ? schedule.time.split(':')[1] : '00';
+                        const updated = [...lessonSchedules];
+                        updated[index].time = `${hour}:${minute}`;
+                        setLessonSchedules(updated);
+                      }}
+                    >
+                      {['06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22'].map((h) => (
+                        <option key={h} value={h}>{h}시</option>
+                      ))}
+                    </select>
 
-                <select
-                  value={schedule.time ? schedule.time.split(':')[0] : '10'}
-                  onChange={(e) => {
-                    const hour = e.target.value;
-                    const minute = schedule.time ? schedule.time.split(':')[1] : '00';
-                    const updated = [...lessonSchedules];
-                    updated[index].time = `${hour}:${minute}`;
-                    setLessonSchedules(updated);
-                  }}
-                >
-                  {Array.from({ length: 24 }, (_, i) => {
-                    const h = String(i).padStart(2, '0');
-                    return <option key={h} value={h}>{h}시</option>;
-                  })}
-                </select>
+                    <select
+                      value={schedule.time ? schedule.time.split(':')[1] : '00'}
+                      onChange={(e) => {
+                        const hour = schedule.time ? schedule.time.split(':')[0] : '10';
+                        const minute = e.target.value;
+                        const updated = [...lessonSchedules];
+                        updated[index].time = `${hour}:${minute}`;
+                        setLessonSchedules(updated);
+                      }}
+                    >
+                      {['00', '20', '40'].map((m) => (
+                        <option key={m} value={m}>{m}분</option>
+                      ))}
+                    </select>
 
-                <select
-                  value={schedule.time ? schedule.time.split(':')[1] : '00'}
-                  onChange={(e) => {
-                    const hour = schedule.time ? schedule.time.split(':')[0] : '10';
-                    const minute = e.target.value;
-                    const updated = [...lessonSchedules];
-                    updated[index].time = `${hour}:${minute}`;
-                    setLessonSchedules(updated);
-                  }}
-                >
-                  {['00', '10', '20', '30', '40', '50'].map((m) => (
-                    <option key={m} value={m}>{m}분</option>
-                  ))}
-                </select>
-
-                {lessonSchedules.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (lessonSchedules.length === 1) return;
-                      setLessonSchedules(lessonSchedules.filter((_, i) => i !== index));
-                    }}
-                    className="member-del-btn"
-                  >
-                    삭제
-                  </button>
-                )}
-              </div>
-            ))}
+                    {lessonSchedules.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (lessonSchedules.length === 1) return;
+                          setLessonSchedules(lessonSchedules.filter((_, i) => i !== index));
+                        }}
+                        className="member-del-btn"
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </>
+            ) : (
+              <p className="register-pass-note">
+                회원 정보만 등록합니다. 이용권과 레슨 일정은 회원 상세에서 나중에 추가할 수 있습니다.
+              </p>
+            )}
           </div>
 
         </div>
@@ -431,6 +428,6 @@ export function MemberRegister({ isOpen, onClose, onSave, member }) {
           <button onClick={onClose} className="btn btn-cancel">취소</button>
         </div>
       </div>
-    </Backdrop>
+    </Backdrop >
   );
 }

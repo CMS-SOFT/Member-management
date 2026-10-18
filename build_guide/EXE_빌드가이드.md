@@ -1,8 +1,7 @@
 # Windows EXE 만들기 가이드 (court mate)
 
-> ⚠️ 현재 상태: exe 빌드 자체는 되지만, **실행 시 CSS(스타일)가 적용 안 되는 문제 미해결**.
-> 프로젝트 소스는 exe 작업 이전으로 원복해 둔 상태(웹/안드로이드는 정상).
-> exe를 다시 하려면 아래 순서 + "미해결 이슈" 항목을 참고하세요.
+> EXE는 Electron에서 Vite 빌드 결과를 실행하며, 백엔드와 기본 DB도 패키지에 포함해야 합니다.
+> 실행 중 변경되는 DB는 설치 폴더가 아닌 사용자 데이터 폴더에 저장됩니다.
 
 ---
 
@@ -16,25 +15,26 @@
 
 ---
 
-## 1. 필요한 파일/설정 (원복돼서 지금은 없음 — 다시 만들어야 함)
+## 1. 패키징 설정
 
 ### package.json 에 추가
 ```json
 "main": "electron/main.cjs",
 "scripts": {
   "electron:dev": "npm run build && electron .",
-  "electron:build": "npm run build && electron-builder --win zip --x64"
+  "electron:build": "npm run build && electron-rebuild && electron-builder --win portable --x64"
 },
 "build": {
   "appId": "com.courtmate.app",
   "productName": "court mate",
-  "directories": { "output": "C:/Users/CHOMINSIK/AppData/Local/cm-build" },
-  "files": ["dist/**/*", "electron/**/*"],
-  "win": { "target": [{ "target": "zip", "arch": ["x64"] }] }
+  "directories": { "output": "release" },
+  "files": ["dist/**/*", "electron/**/*", "server/**/*"],
+  "win": { "target": [{ "target": "portable", "arch": ["x64"] }] }
 }
 ```
-> output을 프로젝트(Documents) 안에 두면 OneDrive 동기화 때문에 `EPERM` 오류가 남.
-> 그래서 AppData\Local 로 지정.
+`server` 파일이 빠지면 실행 파일에서 백엔드를 시작할 수 없습니다.
+앱은 최초 실행 때 패키지의 `server/member_management.db`를 사용자 데이터 폴더로 복사합니다.
+이후 DB는 Electron의 `app.getPath('userData')` 경로에서 읽고 씁니다.
 
 ### electron/main.cjs (새로 생성)
 - dist/index.html 을 창으로 띄우는 파일.
@@ -59,7 +59,7 @@ C:\Users\CHOMINSIK\AppData\Local\cm-build\
 
 ---
 
-## 3. ★ 미해결 이슈: exe 실행 시 스타일(CSS) 안 먹음
+## 3. 이전 스타일 이슈 참고
 
 ### 증상
 - exe 실행 시 React는 렌더되는데(글자/버튼은 보임) **CSS가 전혀 적용 안 됨**. 밋밋한 흰 화면.
@@ -86,7 +86,7 @@ C:\Users\CHOMINSIK\AppData\Local\cm-build\
 
 | 증상 | 원인 / 해결 |
 | --- | --- |
-| exe 스타일 안 먹음 | 위 3번 "미해결 이슈" 참고. 로컬 웹서버 방식 권장 |
+| 회원정보를 불러오지 못함 | EXE에 `server`가 포함됐는지 확인하고, 사용자 데이터 폴더의 DB 파일을 확인 |
 | `EPERM: operation not permitted` | output이 OneDrive 폴더(Documents). AppData\Local 로 지정 |
 | `spawn UNKNOWN` (nsis 빌드) | 이 PC에선 설치형(nsis) 빌드 실패. `zip` 타겟만 사용 |
 | Setup.exe 가 186KB로 작음 | nsis 빌드 실패로 페이로드 없는 껍데기. 사용 금지 |

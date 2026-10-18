@@ -1,5 +1,11 @@
-// CSV 내보내기/가져오기 유틸. 엑셀에서 바로 열 수 있도록 UTF-8 BOM을 포함합니다.
-// 컴퓨터 초보자를 위해 컬럼 이름은 한글로 쓰고, id 같은 내부 번호는 파일에 넣지 않습니다.
+// CSV 내보내기/가져오기 유틸.
+// 엑셀에서 바로 열 수 있도록 UTF-8 BOM을 포함합니다.
+//
+// 규칙:
+//   - 헤더(필드명)는 한글로 — 초보자도 직관적으로 알 수 있도록
+//   - 데이터 컬럼은 다른 PC에서 재구성하는 데 필요한 값만 포함
+//   - id, use_flag 는 DB 자동생성/기본값이므로 CSV에 포함하지 않음
+//   - 불러오기 시 한글 헤더 → DB 컬럼명으로 자동 매핑
 
 function escapeCell(value) {
   const text = value == null ? '' : String(value);
@@ -7,267 +13,239 @@ function escapeCell(value) {
   return text;
 }
 
-// 간단한 CSV 파서 (따옴표로 감싼 셀, 이스케이프된 따옴표 지원)
 function parseCsv(text) {
-  // BOM 및 제어 문자 제거를 더 안전하게 처리 (특수 유니코드 문자 및 공백 제거)
   const clean = text.replace(/^[\uFEFF\uFFFE\s]+/, '').trimStart();
   const rows = [];
-  let row = [];
-  let cell = '';
-  let inQuotes = false;
-  for (let index = 0; index < clean.length; index += 1) {
-    const char = clean[index];
+  let row = [], cell = '', inQuotes = false;
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i];
     if (inQuotes) {
-      if (char === '"') {
-        if (clean[index + 1] === '"') { cell += '"'; index += 1; }
+      if (ch === '"') {
+        if (clean[i + 1] === '"') { cell += '"'; i++; }
         else inQuotes = false;
-      } else cell += char;
-    } else if (char === '"') {
+      } else cell += ch;
+    } else if (ch === '"') {
       inQuotes = true;
-    } else if (char === ',') {
+    } else if (ch === ',') {
       row.push(cell); cell = '';
-    } else if (char === '\n' || char === '\r') {
-      if (char === '\r' && clean[index + 1] === '\n') index += 1;
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && clean[i + 1] === '\n') i++;
       row.push(cell); cell = '';
       rows.push(row); row = [];
-    } else cell += char;
+    } else cell += ch;
   }
   if (cell !== '' || row.length > 0) { row.push(cell); rows.push(row); }
-  return rows.filter((cells) => cells.some((value) => String(value).trim() !== ''));
+  return rows.filter((r) => r.some((v) => String(v).trim() !== ''));
 }
 
 function rowsToRecords(rows, aliasMap) {
   if (rows.length === 0) return [];
-  const headerKeys = rows[0].map((value) => aliasMap[String(value).trim()] || String(value).trim());
+  const keys = rows[0].map((v) => {
+    const t = String(v).trim();
+    return aliasMap[t] !== undefined ? aliasMap[t] : t;
+  });
   return rows.slice(1).map((cells) => {
-    const record = {};
-    headerKeys.forEach((key, index) => { record[key] = cells[index] != null ? String(cells[index]).trim() : ''; });
-    return record;
+    const rec = {};
+    keys.forEach((key, i) => {
+      if (key !== '_ignore') rec[key] = cells[i] != null ? String(cells[i]).trim() : '';
+    });
+    return rec;
   });
 }
 
-// --- 날짜로부터 요일 추출 헬퍼 ---
-function getDayOfWeek(dateStr) {
-  const dateObj = new Date(dateStr);
-  if (isNaN(dateObj.getTime())) return '';
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  return days[dateObj.getDay()];
+function getDayOfWeekFull(dateStr) {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][d.getDay()];
 }
 
-// --- 스케줄 CSV ---
-const SCHEDULE_COLUMNS = [
-  ['date', '날짜'], ['time', '시간'], ['name', '회원명'], ['status', '상태'], ['note', '메모'],
-];
+// ══════════════════════════════════════════════════════════════════════
+// members (회원): id/use_flag 제외, 이관 가능한 모든 데이터 필드
+// ══════════════════════════════════════════════════════════════════════
+const MEMBER_DB_COLS = ['name', 'birth', 'phone', 'gender', 'level', 'lessonType', 'role', 'status'];
+const MEMBER_KR_HDRS = ['회원명', '생년월일', '전화번호', '성별', '레벨', '레슨유형', '권한', '회원상태'];
+
+const MEMBER_ALIASES = {
+  회원명: 'name', 이름: 'name',
+  생년월일: 'birth',
+  전화번호: 'phone',
+  성별: 'gender',
+  레벨: 'level',
+  레슨구분: 'lessonType', 수업형태: 'lessonType', 레슨유형: 'lessonType',
+  권한: 'role',
+  회원상태: 'status', 상태: 'status',
+  사용여부: 'use_flag',
+  name: 'name', birth: 'birth', phone: 'phone', gender: 'gender',
+  level: 'level', lessonType: 'lessonType', role: 'role', status: 'status',
+  use_flag: 'use_flag',
+  id: '_ignore',
+};
+
+export function membersToCsv(members) {
+  const header = MEMBER_KR_HDRS.join(',');
+  const rows = (members || [])
+    .filter((m) => m.role !== '관리자' && m.name !== '관리자')
+    .filter((m) => String(m.use_flag || 'Y').toUpperCase() !== 'N')
+    .map((m) => MEMBER_DB_COLS.map((col) => escapeCell(m[col])).join(','));
+  return `\uFEFF${[header, ...rows].join('\r\n')}`;
+}
+
+export function parseMembersCsv(text) {
+  return rowsToRecords(parseCsv(text), MEMBER_ALIASES)
+    .filter((r) => r.name && r.name.trim() !== '' && r.name !== '회원명' && r.name !== 'name')
+    .filter((r) => String(r.use_flag || 'Y').toUpperCase() !== 'N')
+    .map((r) => ({
+      name: r.name || '',
+      birth: r.birth || '',
+      phone: r.phone || '',
+      gender: r.gender || '남',
+      level: r.level || '중',
+      lessonType: r.lessonType || '개인',
+      role: r.role || '사용자',
+      status: r.status || '등록',
+    }));
+}
+
+export function csvToMembers(text) { return parseMembersCsv(text); }
+
+export function memberTemplateCsv() {
+  const sample = ['홍길동', '900101', '010-1234-5678', '남', '중', '개인', '사용자', '등록'];
+  return `\uFEFF${MEMBER_KR_HDRS.join(',')}\r\n${sample.join(',')}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// schedules (스케줄): 내부 ID 대신 회원명으로 연결
+// ══════════════════════════════════════════════════════════════════════
+const SCHEDULE_DB_COLS = ['name', 'date', 'time', 'status', 'note', 'passId'];
+const SCHEDULE_KR_HDRS = ['회원명', '레슨날짜', '레슨시간', '진행상태', '메모', '이용권번호'];
+
 const SCHEDULE_ALIASES = {
-  날짜: 'date', 시간: 'time', 회원명: 'name', 이름: 'name', 상태: 'status', 메모: 'note', 비고: 'note',
-  date: 'date', time: 'time', name: 'name', status: 'status', note: 'note', id: '_ignore', passId: 'passId', 이용권명: 'passId',
+  날짜: 'date', 레슨날짜: 'date',
+  시간: 'time', 레슨시간: 'time',
+  회원명: 'name', 이름: 'name',
+  상태: 'status', 진행상태: 'status',
+  메모: 'note', 비고: 'note',
+  회원번호: 'member_id', 이용권번호: 'passId', 이용권명: 'passId',
+  사용여부: 'use_flag',
+  date: 'date', time: 'time', name: 'name', status: 'status',
+  note: 'note', member_id: 'member_id', passId: 'passId',
+  use_flag: 'use_flag',
+  id: '_ignore',
 };
 
 export function schedulesToCsv(schedules) {
-  const sorted = [...schedules].sort((a, b) =>
-    String(a.date || '').localeCompare(String(b.date || ''))
-    || String(a.name || '').localeCompare(String(b.name || ''), 'ko')
-    || String(a.time || '').localeCompare(String(a.time || '')));
-  const header = SCHEDULE_COLUMNS.map(([, label]) => label).join(',');
-  const rows = sorted.map((schedule) => SCHEDULE_COLUMNS.map(([key]) => escapeCell(schedule[key])).join(','));
+  const header = SCHEDULE_KR_HDRS.join(',');
+  const sorted = [...(schedules || [])]
+    .filter((s) => String(s.use_flag || 'Y').toUpperCase() !== 'N')
+    .sort((a, b) =>
+    String(a.date || '').localeCompare(String(b.date || '')) ||
+    String(a.time || '').localeCompare(String(b.time || '')) ||
+    String(a.name || '').localeCompare(String(b.name || ''), 'ko')
+  );
+  const rows = sorted.map((s) => SCHEDULE_DB_COLS.map((col) => escapeCell(s[col])).join(','));
   return `\uFEFF${[header, ...rows].join('\r\n')}`;
 }
 
 export function csvToSchedules(text) {
-  const records = rowsToRecords(parseCsv(text), SCHEDULE_ALIASES);
-  console.log('변환된 레코드 원본:', records); // 이 로그가 어떻게 찍히는지 확인 필요
-
-  return records
-    .map((record) => {
-      const date = record.date || '';
-      const name = record.name || '';
-      const dateObj = new Date(date);
-      let passId = '';
-      if (!isNaN(dateObj.getTime())) {
-        const yy = String(dateObj.getFullYear()).slice(-2);
-        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(dateObj.getDate()).padStart(2, '0');
-        passId = `${name}_${yy}${mm}${dd}`;
-      }
-      return {
-        date,
-        time: record.time || '',
-        name,
-        status: record.status || '예약',
-        note: record.note || '',
-        passId: record.passId || passId,
-      };
-    })
-    .filter((schedule) => {
-      const isValid = schedule.date && schedule.name;
-      if (!isValid) {
-        console.log('필터링되어 탈락한 스케줄:', schedule);
-      }
-      return isValid;
-    });
+  return rowsToRecords(parseCsv(text), SCHEDULE_ALIASES)
+    .filter((r) => r.date && r.name && r.date !== '날짜' && r.date !== '레슨날짜' && r.date !== 'date')
+    .filter((r) => String(r.use_flag || 'Y').toUpperCase() !== 'N')
+    .map((r) => ({
+      date: r.date || '',
+      time: r.time || '',
+      name: r.name || '',
+      status: r.status || '예약',
+      note: r.note || '',
+      member_id: r.member_id ? Number(r.member_id) : null,
+      passId: r.passId || '',
+    }));
 }
 
-/**
- * 스케줄 데이터로부터 회원별 고정 레슨 요일/시간(member_lessons 테이블용)을 안전하게 추출합니다.
- * 동일한 회원-요일-시간 조합은 중복 제거됩니다.
- */
-export function extractMemberLessons(schedules) {
-  const map = new Map();
-  (schedules || []).forEach((sch) => {
-    if (!sch.name || !sch.date || !sch.time) return;
-    const day = getDayOfWeek(sch.date);
-    if (!day) return;
-
-    const key = `${sch.name}_${day}_${sch.time}`;
-    if (!map.has(key)) {
-      map.set(key, {
-        name: sch.name,
-        day: day,
-        time: sch.time,
-      });
-    }
-  });
-  return Array.from(map.values());
-}
-
-// Admin.jsx에서 직접 호출하는 파싱 함수들 추가
 export function parseSchedulesCsv(text) {
   const schedules = csvToSchedules(text);
   const memberLessons = extractMemberLessons(schedules);
   return { schedules, memberLessons };
 }
 
-export function parseMembersCsv(text) {
-  return csvToMembers(text);
+export function scheduleTemplateCsv() {
+  const sample = ['홍길동', '2026-10-01', '10:00', '예약', '', ''];
+  return `\uFEFF${SCHEDULE_KR_HDRS.join(',')}\r\n${sample.join(',')}`;
 }
 
-export function parsePassesCsv(text) {
-  return csvToPasses(text);
+// schedules → member_lessons 재생성용 데이터 추출 (회원-요일-시간 중복 제거)
+export function extractMemberLessons(schedules) {
+  const map = new Map();
+  (schedules || []).forEach((s) => {
+    if (!s.name || !s.date || !s.time) return;
+    const day = getDayOfWeekFull(s.date);
+    if (!day) return;
+    const key = `${s.name}_${day}_${s.time}`;
+    if (!map.has(key)) {
+      map.set(key, { member_id: s.member_id || null, name: s.name, date: s.date, day, time: s.time });
+    }
+  });
+  return Array.from(map.values());
 }
 
-// --- 회원 CSV (실제 DB 구조 반영: name, birth, phone, gender, level, lessonType) ---
-const MEMBER_COLUMNS = [
-  ['name', '회원명'], ['birth', '생년월일'], ['phone', '전화번호'],
-  ['gender', '성별'], ['level', '레벨'], ['lessonType', '수업형태'],
-];
+// ══════════════════════════════════════════════════════════════════════
+// passes  (이용권 — 내부 자동생성, 화면 메뉴 미노출)
+// passes (이용권): id/use_flag 제외, member_id는 회원명으로 다시 연결
+// ══════════════════════════════════════════════════════════════════════
+const PASS_DB_COLS = ['name', 'total', 'used', 'remaining', 'status', 'registeredAt'];
+const PASS_KR_HDRS = ['회원명', '총횟수', '사용횟수', '잔여횟수', '이용권상태', '등록일'];
 
-const MEMBER_ALIASES = {
-  회원명: 'name', 이름: 'name', 생년월일: 'birth', 전화번호: 'phone', 성별: 'gender', 레벨: 'level',
-  수업형태: 'lessonType', 레슨유형: 'lessonType',
-  name: 'name', birth: 'birth', phone: 'phone', gender: 'gender', level: 'level',
-  lessonType: 'lessonType', id: '_ignore',
-};
-
-export function membersToCsv(members) {
-  const filteredMembers = (members || []).filter(
-    (member) => member.role !== '관리자' && member.name !== '관리자'
-  );
-  const header = MEMBER_COLUMNS.map(([, label]) => label).join(',');
-  const rows = filteredMembers.map((member) => MEMBER_COLUMNS.map(([key]) => escapeCell(member[key])).join(','));
-  return `\uFEFF${[header, ...rows].join('\r\n')}`;
-}
-
-export function csvToMembers(text) {
-  return rowsToRecords(parseCsv(text), MEMBER_ALIASES)
-    .map((record) => ({
-      name: record.name || '',
-      birth: record.birth || '',
-      phone: record.phone || '',
-      gender: record.gender || '',
-      level: record.level || '',
-      lessonType: record.lessonType || '개인',
-      role: '사용자',
-      status: '등록',
-    }))
-    .filter((member) => member.name && member.name.trim() !== '' && member.name !== '회원명');
-}
-
-// --- 이용권 CSV ---
-const PASS_COLUMNS = [
-  ['name', '회원명'], ['total', '전체횟수'], ['used', '사용횟수'], ['registeredAt', '등록일'],
-];
 const PASS_ALIASES = {
-  회원명: 'name', 이름: 'name', 전체횟수: 'total', 총횟수: 'total', 사용횟수: 'used', 등록일: 'registeredAt',
-  passId: 'passId', 이용권명: 'passId',
-  남은횟수: '_ignore', 상태: '_ignore',
-  name: 'name', total: 'total', used: 'used', remaining: '_ignore', status: '_ignore',
-  registeredAt: 'registeredAt', id: '_ignore',
+  회원명: 'name', 이름: 'name', 총횟수: 'total', 전체횟수: 'total',
+  사용횟수: 'used', 잔여횟수: 'remaining', 남은횟수: 'remaining',
+  이용권상태: 'status', 상태: 'status', 등록일: 'registeredAt',
+  name: 'name', total: 'total', used: 'used', remaining: 'remaining',
+  status: 'status', registeredAt: 'registeredAt', member_id: 'member_id',
+  id: '_ignore', use_flag: '_ignore', passId: '_ignore',
 };
 
 export function passesToCsv(passes) {
-  const sorted = [...(passes || [])].sort((a, b) =>
-    String(a.name || '').localeCompare(String(b.name || ''), 'ko')
-    || String(a.registeredAt || '').localeCompare(String(b.registeredAt || '')));
-  const header = PASS_COLUMNS.map(([, label]) => label).join(',');
-  const rows = sorted.map((pass) => PASS_COLUMNS.map(([key]) => escapeCell(pass[key])).join(','));
+  const header = PASS_KR_HDRS.join(',');
+  const sorted = [...(passes || [])]
+    .filter((p) => String(p.use_flag || 'Y').toUpperCase() !== 'N')
+    .sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''), 'ko') ||
+    String(a.registeredAt || '').localeCompare(String(b.registeredAt || ''))
+  );
+  const rows = sorted.map((p) => PASS_DB_COLS.map((col) => escapeCell(p[col])).join(','));
   return `\uFEFF${[header, ...rows].join('\r\n')}`;
 }
 
 export function csvToPasses(text) {
-  const currentDate = new Date('2026-09-21');
   return rowsToRecords(parseCsv(text), PASS_ALIASES)
-    .map((record) => {
-      const name = record.name || '';
-      const total = Number(record.total || 0);
-      let used = Number(record.used || 0);
-      const registeredAt = record.registeredAt || new Date().toISOString().slice(0, 10);
-
-      let passId = record.passId || '';
-      if (!passId && registeredAt) {
-        const dt = new Date(registeredAt);
-        if (!isNaN(dt.getTime())) {
-          const yy = String(dt.getFullYear()).slice(-2);
-          const mm = String(dt.getMonth() + 1).padStart(2, '0');
-          const dd = String(dt.getDate()).padStart(2, '0');
-          passId = `${name}_${yy}${mm}${dd}`;
-        }
-      }
-
-      const regDateObj = new Date(registeredAt);
-      if (!isNaN(regDateObj.getTime()) && regDateObj < currentDate) {
-        if (record.used === '' || record.used == null) {
-          used = total;
-        }
-      }
-
+    .filter((r) => r.name && r.total)
+    .map((r) => {
+      const total = Number(r.total || 0);
+      const used = Number(r.used || 0);
+      const remaining = r.remaining !== '' ? Number(r.remaining) : Math.max(total - used, 0);
       return {
-        passId,
-        name,
+        name: r.name || '',
         total,
         used,
-        remaining: Math.max(total - used, 0),
-        status: used >= total && total > 0 ? '완료' : '이용중',
-        registeredAt,
+        remaining,
+        status: r.status || (remaining > 0 ? '이용중' : '완료'),
+        registeredAt: r.registeredAt || new Date().toISOString().slice(0, 10),
+        member_id: r.member_id ? Number(r.member_id) : null,
       };
-    })
-    .filter((pass) => pass.name && pass.total > 0);
+    });
 }
 
-// 빈 양식
-export function scheduleTemplateCsv() {
-  const header = SCHEDULE_COLUMNS.map(([, label]) => label).join(',');
-  return `\uFEFF${header}\r\n2026-09-20,18:00,홍길동,예약,`;
-}
-export function memberTemplateCsv() {
-  const header = MEMBER_COLUMNS.map(([, label]) => label).join(',');
-  return `\uFEFF${header}\r\n홍길동,900101,010-1234-5678,남,중,개인`;
-}
-export function passTemplateCsv() {
-  const header = PASS_COLUMNS.map(([, label]) => label).join(',');
-  return `\uFEFF${header}\r\n홍길동,8,0,2026-09-01`;
-}
+export function parsePassesCsv(text) { return csvToPasses(text); }
 
-// 다운로드 처리 함수 (수정된 버전: 올바른 인자 순서 처리)
+// ══════════════════════════════════════════════════════════════════════
+// 공통 다운로드
+// ══════════════════════════════════════════════════════════════════════
 function downloadCsvWeb(csvText, filename) {
   const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
 }
 
 async function downloadCsvNative(csvText, filename) {
@@ -275,15 +253,16 @@ async function downloadCsvNative(csvText, filename) {
   const { Share } = await import('@capacitor/share');
   await Filesystem.writeFile({ path: filename, data: csvText, directory: Directory.Cache, encoding: Encoding.UTF8 });
   const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
-  try {
-    await Share.share({ title: filename, url: uri, dialogTitle: '파일 내보내기' });
-  } catch { }
+  await Share.share({ title: filename, url: uri, dialogTitle: '파일 내보내기' });
 }
 
 export function downloadCsv(csvText, filename) {
   const cap = typeof window !== 'undefined' ? window.Capacitor : undefined;
   if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) {
-    downloadCsvNative(csvText, filename).catch(() => downloadCsvWeb(csvText, filename));
+    downloadCsvNative(csvText, filename).catch((error) => {
+      console.error(`파일을 내보내지 못했습니다 (${filename}):`, error);
+      downloadCsvWeb(csvText, filename);
+    });
     return;
   }
   downloadCsvWeb(csvText, filename);

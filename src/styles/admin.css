@@ -120,6 +120,375 @@
     box-shadow: 0 9px 22px #2c202508;
 }
 
+.settlement-section .schedule-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.settlement-total {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    color: #766f73;
+    font-size: 11px;
+}
+
+.settlement-total b {
+    color: var(--wine);
+    font-size: 16px;
+}
+
+.settlement-hint {
+    margin: 16px 0 10px;
+    color: #766f73;
+    font-size: 11px;
+}
+
+.settlement-amount {
+    width: min(220px, 70%);
+    padding: 8px 10px;
+    border: 1px solid #e1d9dc;
+    border-radius: 4px;
+    color: #262127;
+    text-align: right;
+}
+
+.settlement-won {
+    margin-left: 8px;
+}
+
+.settlement-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.settlement-saved,
+.settlement-error {
+    font-size: 11px;
+}
+
+.settlement-saved {
+    color: #427451;
+}
+
+.settlement-error {
+    color: #a2213f;
+}
+
+.settlement-controls-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 16px;
+}
+
+.settlement-left,
+.settlement-right {
+    display: flex;
+    flex: 1 1 0;
+    align-items: center;
+}
+
+.settlement-right {
+    justify-content: flex-end;
+}
+
+.settlement-member-select,
+.settlement-view-select {
+    height: 36px;
+    max-width: 100%;
+    padding: 0 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    color: var(--ink);
+    background: #fff;
+    font-size: 14px;
+}
+
+.settlement-member-select {
+    min-width: 150px;
+}
+
+.settlement-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.settlement-center .month-switcher {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+.settlement-center .month-switcher button {
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink);
+    background: #fff;
+    font-size: 18px;
+}
+
+.settlement-center .month-switcher strong {
+    min-width: 110px;
+    color: var(--ink);
+    font-size: 18px;
+    text-align: center;
+}
+
+.settlement-center .settlement-total {
+    gap: 7px;
+    font-size: 12px;
+}
+
+.settlement-center .settlement-total b {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.settlement-section .settlement-actions {
+    justify-content: flex-end;
+    margin: 0 0 12px;
+}
+
+.settlement-calendar,
+.settlement-list-wrap {
+    overflow-x: auto;
+}
+
+.settlement-weekdays,
+.settlement-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 8px;
+    min-width: 700px;
+}
+
+.settlement-weekdays {
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.settlement-weekdays b {
+    padding: 5px;
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.settlement-weekdays b:first-child {
+    color: #c00;
+}
+
+.settlement-weekdays b:last-child {
+    color: #00c;
+}
+
+.settlement-calendar-day {
+    min-width: 0;
+    min-height: 110px;
+    padding: 7px;
+    border: 1px solid var(--border-rose);
+    border-radius: 4px;
+    background: #fff;
+}
+
+.settlement-calendar-day.outside {
+    opacity: .4;
+}
+
+.settlement-day-number {
+    display: block;
+    margin: 0 0 5px;
+    padding: 0;
+    border: 0;
+    color: var(--ink);
+    background: transparent;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.settlement-day-number:not(:disabled) {
+    cursor: pointer;
+}
+
+.settlement-day-summary {
+    margin: 0 0 4px;
+    color: var(--wine);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.settlement-calendar-entry,
+.settlement-calendar-legacy {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px;
+    margin-top: 3px;
+    padding: 3px 4px;
+    overflow: hidden;
+    border: 0;
+    border-radius: 3px;
+    color: var(--ink);
+    background: #fff1f4;
+    font-size: 10px;
+    text-align: left;
+}
+
+.settlement-calendar-entry {
+    cursor: pointer;
+}
+
+.settlement-calendar-entry:disabled {
+    cursor: default;
+    opacity: .7;
+}
+
+.settlement-calendar-entry strong,
+.settlement-calendar-legacy strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.settlement-calendar-entry span,
+.settlement-calendar-legacy span {
+    flex: 0 0 auto;
+}
+
+.settlement-calendar-legacy {
+    color: #766f73;
+    background: #f2eff0;
+}
+
+.settlement-list-table {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
+}
+
+.settlement-list-table th {
+    padding: 10px;
+    border-bottom: 2px solid #ddd;
+    background: #f9f9f9;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.settlement-list-table td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    color: var(--ink);
+    font-size: 13px;
+}
+
+.settlement-list-table tbody tr.editable {
+    cursor: pointer;
+}
+
+.settlement-list-table tbody tr.editable:hover,
+.settlement-list-table tbody tr.editable:focus {
+    background: #fafafa;
+}
+
+.settlement-popup {
+    position: relative;
+    width: min(420px, 100%);
+    max-height: calc(100vh - 40px);
+    padding: 24px;
+    overflow-y: auto;
+    border: 1px solid var(--border-rose);
+    border-radius: 8px;
+    color: var(--ink);
+    background: #fff;
+    box-shadow: 0 18px 45px #0003;
+}
+
+.settlement-editor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+}
+
+.settlement-editor-header.modal-header {
+    align-items: center;
+    padding-bottom: 12px;
+}
+
+.settlement-editor-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.settlement-editor-header.modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.settlement-editor-date {
+    margin: 12px 0;
+    color: var(--muted);
+}
+
+.settlement-editor > label {
+    display: grid;
+    gap: 6px;
+    margin: 12px 0;
+    font-size: 13px;
+}
+
+.settlement-editor > label input,
+.settlement-editor > label select {
+    width: 100%;
+    min-height: 38px;
+    padding: 7px 9px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink);
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.settlement-editor-amount {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settlement-editor-amount input {
+    flex: 1;
+    text-align: right;
+}
+
+.settlement-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.settlement-editor-actions button {
+    min-height: 36px;
+    padding: 0 12px;
+    white-space: nowrap;
+}
+
+.settlement-editor-error {
+    color: #a2213f;
+    font-size: 12px;
+}
+
 .add-button,
 .floating-add,
 .modal-add-button {
@@ -367,6 +736,27 @@
 
     .admin-section {
         padding: 16px 10px;
+    }
+
+    .settlement-controls-bar {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .settlement-left,
+    .settlement-right {
+        flex: 1 1 calc(50% - 5px);
+    }
+
+    .settlement-center {
+        order: -1;
+        flex: 1 0 100%;
+    }
+
+    .settlement-member-select,
+    .settlement-view-select {
+        width: 100%;
+        min-width: 0;
     }
 
     .admin-calendar-day {

@@ -9,10 +9,14 @@ import { MemberTable } from './member/MemberTable';
 import { ScheduleSection } from './schedule/ScheduleSection';
 import { LessonListModal } from './schedule/LessonListModal';
 import { LessonEditor } from './schedule/LessonEditor';
+import { SettlementSection } from './SettlementSection';
 import {
-  passesToCsv, membersToCsv,
-  downloadCsv, parsePassesCsv, parseMembersCsv
+  passesToCsv, membersToCsv, schedulesToCsv,
+  downloadCsv, parsePassesCsv, parseMembersCsv, parseSchedulesCsv,
+  memberTemplateCsv, scheduleTemplateCsv
 } from '../lib/csv';
+import { replaceAllMembers } from '../lib/memberService';
+import { replaceAllSchedules } from '../lib/scheduleService';
 
 // 관리자 비밀번호 확인 및 초기화 완료 모달
 function AdminClearConfirmModal({ members = [], onConfirm, onCancel }) {
@@ -52,7 +56,7 @@ function AdminClearConfirmModal({ members = [], onConfirm, onCancel }) {
           <>
             <h3>모든 자료를 지울까요?</h3>
             <p>
-              회원·스케줄·이용권이 전부 지워져요. (관리자 계정은 그대로 있고, 한 번 지우면 되돌릴 수 없어요.)
+              회원·스케줄·이용권·고정 레슨·정산·알림이 모두 삭제돼요. (관리자 계정은 그대로 있고, 한 번 지우면 되돌릴 수 없어요.)
               걱정되면 먼저 '자료 관리 → 내려받기'로 파일에 저장해 두세요.
             </p>
             <div style={{ margin: '15px 0 5px 0' }}>
@@ -95,8 +99,8 @@ function AdminClearConfirmModal({ members = [], onConfirm, onCancel }) {
   );
 }
 
-// 통합된 자료 관리 드롭다운 컴포넌트 (스케줄 CSV 관련 항목만 제외)
-function IntegratedCsvTools({ passes, members, onImported, onError, onArchiveExport, onArchiveView, onClearData, apiRequest }) {
+// 통합된 자료 관리 드롭다운 컴포넌트
+function IntegratedCsvTools({ passes, members, schedules, onImported, onError, onArchiveExport, onArchiveView, onClearData, apiRequest }) {
   const [isOpen, setIsOpen] = useState(false);
   const [importingType, setImportingType] = useState(null);
   const menuRef = useRef(null);
@@ -134,6 +138,9 @@ function IntegratedCsvTools({ passes, members, onImported, onError, onArchiveExp
       } else if (type === 'member') {
         const csv = membersToCsv(members);
         downloadCsv(csv, `members_${new Date().toISOString().slice(0, 10)}.csv`);
+      } else if (type === 'schedule') {
+        const csv = schedulesToCsv(schedules);
+        downloadCsv(csv, `schedules_${new Date().toISOString().slice(0, 10)}.csv`);
       }
       setIsOpen(false);
     } catch (err) {
@@ -143,13 +150,11 @@ function IntegratedCsvTools({ passes, members, onImported, onError, onArchiveExp
 
   const handleTemplate = (type) => {
     try {
-      let csv = '';
-      if (type === 'pass') {
-        csv = 'name,total,used,remaining,status,registeredAt\n홍길동,12,0,12,이용중,2026-09-01';
-      } else if (type === 'member') {
-        csv = 'name,phone,birth,gender,role\n홍길동,010-1234-5678,900101,여,회원';
+      if (type === 'member') {
+        downloadCsv(memberTemplateCsv(), 'member_template.csv');
+      } else if (type === 'schedule') {
+        downloadCsv(scheduleTemplateCsv(), 'schedule_template.csv');
       }
-      downloadCsv(csv, `${type}_template.csv`);
       setIsOpen(false);
     } catch (err) {
       onError?.(`양식 다운로드 실패: ${err.message}`);
@@ -185,19 +190,21 @@ function IntegratedCsvTools({ passes, members, onImported, onError, onArchiveExp
           parsedData = parsePassesCsv(text);
         } else if (type === 'member') {
           parsedData = parseMembersCsv(text);
+        } else if (type === 'schedule') {
+          parsedData = parseSchedulesCsv(text);
         }
 
         if (apiRequest) {
-          const listToSave = parsedData.passes || parsedData.members || parsedData;
-
           if (type === 'pass') {
-            for (let i = 0; i < listToSave.length; i++) {
-              await apiRequest({ action: 'appendPass', pass: listToSave[i] });
+            for (let i = 0; i < parsedData.length; i++) {
+              await apiRequest({ action: 'appendPass', pass: parsedData[i] });
             }
           } else if (type === 'member') {
-            for (let i = 0; i < listToSave.length; i++) {
-              await apiRequest({ action: 'appendMember', member: listToSave[i] });
-            }
+            if (!parsedData.length) throw new Error('회원 정보가 없는 파일은 불러올 수 없어요.');
+            await replaceAllMembers(parsedData);
+          } else if (type === 'schedule') {
+            if (!parsedData.schedules?.length) throw new Error('스케줄 정보가 없는 파일은 불러올 수 없어요.');
+            await replaceAllSchedules(parsedData.schedules);
           }
         }
 
@@ -213,6 +220,11 @@ function IntegratedCsvTools({ passes, members, onImported, onError, onArchiveExp
     };
 
     reader.readAsText(file, 'utf-8');
+    reader.onerror = () => {
+      onError?.(`파일을 읽지 못했어요: ${reader.error?.message || '파일 읽기 오류'}`);
+      setImportingType(null);
+      setIsOpen(false);
+    };
   };
 
   const dropdownBtnStyle = {
@@ -281,23 +293,23 @@ function IntegratedCsvTools({ passes, members, onImported, onError, onArchiveExp
           gap: '12px',
           textAlign: 'left'
         }}>
-          {/* 이용권 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--wine)' }}>이용권</span>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button onClick={() => handleExport('pass')} style={dropdownBtnStyle}>내려받기</button>
-              <button onClick={() => triggerImport('pass')} style={getImportBtnStyle('pass')}>불러오기</button>
-              <button onClick={() => handleTemplate('pass')} style={dropdownBtnStyle}>빈 양식</button>
-            </div>
-          </div>
-
-          {/* 회원 */}
+          {/* 회원 — 핵심 이전 파일 1 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--wine)' }}>회원</span>
             <div style={{ display: 'flex', gap: '6px' }}>
               <button onClick={() => handleExport('member')} style={dropdownBtnStyle}>내려받기</button>
               <button onClick={() => triggerImport('member')} style={getImportBtnStyle('member')}>불러오기</button>
               <button onClick={() => handleTemplate('member')} style={dropdownBtnStyle}>빈 양식</button>
+            </div>
+          </div>
+
+          {/* 스케줄 — 핵심 이전 파일 2 */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--wine)' }}>스케줄</span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button onClick={() => handleExport('schedule')} style={dropdownBtnStyle}>내려받기</button>
+              <button onClick={() => triggerImport('schedule')} style={getImportBtnStyle('schedule')}>불러오기</button>
+              <button onClick={() => handleTemplate('schedule')} style={dropdownBtnStyle}>빈 양식</button>
             </div>
           </div>
 
@@ -328,10 +340,29 @@ function IntegratedCsvTools({ passes, members, onImported, onError, onArchiveExp
 }
 
 // 관리자 대시보드 메인 컴포넌트
-export function Admin({ initialMembers, schedules, onSchedulesChange, passes, onPassesChange, apiRequest, sheetLoadError }) {
+export function Admin({
+  initialMembers,
+  schedules,
+  onSchedulesChange,
+  passes,
+  onPassesChange,
+  settlements,
+  onSettlementsChange,
+  apiRequest,
+  sheetLoadError,
+}) {
   const [activeTab, setActiveTab] = useState('schedule');
   const [centerAlert, setCenterAlert] = useState(''); // 화면 중앙 팝업 상태 추가
-  const data = useAdminData({ initialMembers, schedules, onSchedulesChange, passes, onPassesChange, apiRequest });
+  const data = useAdminData({
+    initialMembers,
+    schedules,
+    onSchedulesChange,
+    passes,
+    onPassesChange,
+    settlements,
+    onSettlementsChange,
+    apiRequest,
+  });
   const { members, lessons, passList, selectedMonth, filteredLessons, monthLessons, stats } = data;
 
   return (
@@ -343,6 +374,7 @@ export function Admin({ initialMembers, schedules, onSchedulesChange, passes, on
           <IntegratedCsvTools
             passes={passList}
             members={members}
+            schedules={lessons}
             onImported={data.handleImported}
             onError={data.setSyncError}
             onArchiveExport={data.runArchiveExport}
@@ -371,6 +403,9 @@ export function Admin({ initialMembers, schedules, onSchedulesChange, passes, on
           <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>
             ♙ <span>회원정보</span>
           </button>
+          <button className={activeTab === 'settlements' ? 'active' : ''} onClick={() => setActiveTab('settlements')}>
+            ₩ <span>정산</span>
+          </button>
         </div>
 
         {/* 우측에 항상 고정될 회원 등록 버튼 */}
@@ -386,6 +421,15 @@ export function Admin({ initialMembers, schedules, onSchedulesChange, passes, on
           onOpenMember={data.setSelectedMember}
           onOpenRegister={() => data.setIsRegisterOpen(true)}
           onReregister={data.setReregisterMember}
+        />
+      ) : activeTab === 'settlements' ? (
+        <SettlementSection
+          members={members}
+          settlements={data.settlementList}
+          selectedMonth={selectedMonth}
+          onMoveMonth={data.moveMonth}
+          onSave={data.saveSettlement}
+          onDelete={data.deleteSettlement}
         />
       ) : (
         <ScheduleSection
@@ -405,20 +449,16 @@ export function Admin({ initialMembers, schedules, onSchedulesChange, passes, on
         />
       )}
 
-      {data.selectedMember && <MemberDetail member={data.selectedMember} passes={passList.filter((pass) => pass.name === data.selectedMember.name)} onSave={data.updateMember} onDelete={data.deleteMember} onAddPass={data.addPass} onDeletePass={data.removePass} onClose={() => data.setSelectedMember(null)} />}
+      {data.selectedMember && <MemberDetail member={data.selectedMember} schedules={lessons} passes={passList.filter((pass) => pass.name === data.selectedMember.name)} onSave={data.updateMember} onDelete={data.deleteMember} onAddPass={data.addPass} onDeletePass={data.removePass} onClose={() => data.setSelectedMember(null)} />}
 
       {/* 회원 등록 결과 메시지를 받아서 중앙 팝업으로 띄우고 완료 시 팝업 닫기 */}
       {data.isRegisterOpen && (
         <MemberRegister
           onSave={async (formData) => {
             try {
-              // 1. 회원 등록 시도
               await data.registerMember(formData);
-
-              // 2. 성공했을 때만 모달 닫기
-              data.setIsRegisterOpen(false);
+              // registerMember 내부에서 members/schedules/passes 상태 갱신 및 모달 닫기까지 처리합니다.
             } catch (error) {
-              // 3. 실패(스케줄 충돌 등)했을 때는 모달을 닫지 않고 에러 메시지 팝업 띄우기
               setCenterAlert(error.message);
             }
           }}

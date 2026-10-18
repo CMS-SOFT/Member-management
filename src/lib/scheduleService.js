@@ -10,13 +10,6 @@ export async function replaceAllSchedules(schedules) {
     });
 }
 
-export async function replaceAllPasses(passes) {
-    return requestServer('/passes/replace', {
-        method: 'POST',
-        body: JSON.stringify({ passes }),
-    });
-}
-
 export async function collectArchivableSchedules(year) {
     const bootstrapData = await requestBootstrap();
     const schedules = bootstrapData.schedules || [];

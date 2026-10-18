@@ -246,8 +246,8 @@
 
 .editor-card {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px 6px;
     padding: 12px 11px;
     border: 1px solid #f0dbe0;
     border-radius: 7px;
@@ -256,6 +256,7 @@
 
 .editor-card label {
     display: grid;
+    min-width: 0;
     gap: 4px;
     color: #6f666b;
     font-size: 9px;
@@ -265,6 +266,7 @@
 .editor-card input,
 .editor-card select {
     width: 100%;
+    min-width: 0;
     height: 29px;
     padding: 0 7px;
     border: 1px solid #ded4d8;
@@ -272,6 +274,16 @@
     color: #322c30;
     background: #fff;
     font-size: 10px;
+}
+
+.editor-date input {
+    padding: 0 4px;
+}
+
+.editor-date,
+.editor-member,
+.editor-status {
+    grid-column: span 2;
 }
 
 .editor-note {

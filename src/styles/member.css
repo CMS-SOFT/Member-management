@@ -1,6 +1,6 @@
-/* member.css — 회원 관리: 이용권 표시/추가, 재등록 버튼, 재등록 팝업 */
+/* member.css — 회원 관리: 이용권 표시/추가, 재등록 버튼, 재등록 팝업, 회원 등록 모달 */
 
-/* 회원 목록 이용권 셀 + 재등록 버튼 */
+/* ── 회원 목록 이용권 셀 + 재등록 버튼 ── */
 .pass-count-cell {
     display: inline-flex;
     align-items: center;
@@ -30,7 +30,7 @@
     opacity: .9;
 }
 
-/* 회원 상세 이용권 섹션 */
+/* ── 회원 상세 이용권 섹션 ── */
 .pass-section {
     margin-top: 8px;
     padding: 14px 16px;
@@ -48,6 +48,13 @@
     gap: 6px;
 }
 
+.pass-list--cards {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+}
+
 .pass-row {
     display: flex;
     align-items: center;
@@ -57,6 +64,50 @@
     border-radius: 6px;
     background: #fff;
     font-size: 12px;
+}
+
+.pass-card {
+    min-width: 0;
+}
+
+.pass-card-view {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    color: inherit;
+    background: transparent;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.pass-card-view b,
+.pass-card-view span {
+    white-space: nowrap;
+}
+
+.pass-card-view i {
+    font-style: normal;
+    font-weight: 700;
+    color: #c88916;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.pass-card.done .pass-card-view i {
+    color: #6f666b;
+}
+
+.pass-view-label {
+    grid-column: 1 / -1;
+    color: var(--wine);
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .pass-row.done {
@@ -84,13 +135,17 @@
 }
 
 .pass-del {
-    width: 22px;
-    height: 22px;
+    flex: 0 0 auto;
+    min-width: 58px;
+    height: 28px;
+    padding: 0 8px;
     border: 1px solid #e5bfc8;
     border-radius: 5px;
     background: #fff7f8;
     color: #a43750;
     font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
     cursor: pointer;
 }
 
@@ -102,22 +157,24 @@
 }
 
 .pass-add {
-    display: flex;
-    align-items: flex-end;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
     margin-top: 10px;
 }
 
 .pass-add label {
     display: grid;
+    min-width: 0;
     gap: 4px;
     font-size: 10px;
     font-weight: 800;
     color: #6f666b;
+    white-space: nowrap;
 }
 
 .pass-add input {
-    width: 90px;
+    width: 100%;
     height: 34px;
     padding: 0 10px;
     border: 1px solid #d9d1d4;
@@ -125,11 +182,118 @@
     font-size: 12px;
 }
 
-.pass-add .primary-button {
+.pass-add select {
+    width: 100%;
     height: 34px;
+    padding: 0 8px;
+    border: 1px solid #d9d1d4;
+    border-radius: 0;
+    background: #fff;
+    font-size: 12px;
 }
 
-/* 재등록 팝업 */
+.pass-add .primary-button {
+    height: 34px;
+    grid-column: 1 / -1;
+    white-space: nowrap;
+}
+
+.pass-schedule-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: #28242a66;
+}
+
+.pass-schedule-modal {
+    display: flex;
+    flex-direction: column;
+    width: min(520px, 100%);
+    max-height: min(400px, calc(100vh - 32px));
+    padding: 18px;
+    border: 1px solid #eee0e4;
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: 0 18px 45px #0003;
+}
+
+.pass-schedule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.pass-schedule-header h3 {
+    min-width: 0;
+    color: var(--ink);
+    font-size: 16px;
+}
+
+.pass-schedule-close {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    color: var(--muted);
+    background: transparent;
+    font-size: 24px;
+}
+
+.pass-schedule-list {
+    display: grid;
+    gap: 6px;
+    max-height: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.pass-schedule-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(48px, auto);
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid #eee0e4;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 12px;
+}
+
+.pass-schedule-row b {
+    color: var(--wine);
+    white-space: nowrap;
+}
+
+.pass-schedule-row span {
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.pass-schedule-row i {
+    color: #c88916;
+    font-style: normal;
+    font-weight: 700;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.pass-schedule-row.done {
+    opacity: .6;
+}
+
+.detail-modal .detail-actions button {
+    flex: 0 0 auto;
+    min-width: 58px;
+    white-space: nowrap;
+}
+
+/* ── 재등록 팝업 ── */
 .reregister-modal {
     width: min(420px, 100%);
 }
@@ -180,4 +344,289 @@
 
 .reregister-preview b {
     color: var(--wine);
+}
+
+/* ── 회원 등록/상세 모달 고유 스타일 (구 MemberRegister.css) ── */
+.member-register-modal {
+    background-color: #fff;
+    width: 540px;
+    max-width: 90vw;
+    height: auto;
+    max-height: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.member-register-modal .modal-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid #eee;
+    cursor: move;
+    user-select: none;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+.member-register-modal .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #333;
+}
+
+.member-register-modal .detail-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+    padding: 16px 20px;
+}
+
+.member-register-modal .detail-form>.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.member-register-modal .detail-form>.full-width,
+.member-register-modal .member-schedule-container {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+}
+
+.member-register-modal .detail-form .field span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #444;
+}
+
+.member-register-modal .detail-form input[type="text"],
+.member-register-modal .detail-form input[type="date"],
+.member-register-modal .detail-form select {
+    width: 100% !important;
+    padding: 7px 10px !important;
+    font-size: 13px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    box-sizing: border-box !important;
+    background-color: #fff !important;
+    outline: none !important;
+}
+
+.member-register-modal .detail-form input:focus,
+.member-register-modal .detail-form select:focus {
+    border-color: var(--wine) !important;
+}
+
+/* 레슨 일정 섹션 */
+.member-register-modal .schedule-section {
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.member-register-modal .register-pass-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #444;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.member-register-modal .register-pass-option input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.member-register-modal .register-pass-note {
+    color: #6f666b;
+    font-size: 12px;
+}
+
+.member-register-modal .member-schedule-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 8px !important;
+    width: 100% !important;
+}
+
+.member-register-modal .schedule-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #444;
+    white-space: nowrap;
+}
+
+.member-register-modal .schedule-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.member-register-modal .start-date-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.member-register-modal .start-date-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    white-space: nowrap;
+}
+
+.member-register-modal .start-date-input {
+    padding: 5px 8px;
+    font-size: 13px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    outline: none;
+    background-color: #fff;
+}
+
+.member-register-modal .start-date-input:focus {
+    border-color: var(--wine);
+}
+
+.member-register-modal .member-add-btn {
+    background-color: #555 !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+}
+
+.member-register-modal .member-add-btn:hover {
+    background-color: #444 !important;
+}
+
+.member-register-modal .member-schedule-row {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+    width: 100% !important;
+}
+
+.member-register-modal .member-schedule-row select {
+    flex: 1 1 0% !important;
+    width: auto !important;
+    padding: 10px 8px !important;
+    font-size: 14px !important;
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    background-color: #fff !important;
+}
+
+.member-register-modal .member-del-btn {
+    flex: 0 0 auto !important;
+    padding: 10px 12px !important;
+    background-color: #a94442 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+}
+
+.member-register-modal .member-del-btn:hover {
+    background-color: #8b3634 !important;
+}
+
+/* 모달 푸터 */
+.member-register-modal .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    background-color: #f9f9f9;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.member-register-modal .modal-footer .btn {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.member-register-modal .btn-save {
+    background-color: var(--wine);
+    color: white;
+}
+
+.member-register-modal .btn-save:hover {
+    background-color: #75001f;
+}
+
+.member-register-modal .btn-cancel {
+    background-color: white;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.member-register-modal .btn-cancel:hover {
+    background-color: #f0f0f0;
+}
+
+/* 경고 알림창 */
+.member-register-alert-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    border-radius: 8px;
+}
+
+.member-register-alert-box {
+    background-color: #fff;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    width: 320px;
+    text-align: center;
+}
+
+.member-register-alert-box p {
+    margin: 0 0 20px 0;
+    font-size: 15px;
+    color: #333;
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.member-register-alert-box button {
+    background-color: var(--wine);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
 }

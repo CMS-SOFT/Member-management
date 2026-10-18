@@ -5,9 +5,9 @@ import { requestBootstrap } from '../lib/bootstrapService';
 export function useAppData() {
     const [directoryMembers, setDirectoryMembers] = useState([]);
     const [adminMembers, setAdminMembers] = useState([]);
-    const [adminHistories, setAdminHistories] = useState([]);
     const [adminSchedules, setAdminSchedules] = useState([]);
     const [adminPasses, setAdminPasses] = useState([]);
+    const [adminSettlements, setAdminSettlements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
 
@@ -16,9 +16,9 @@ export function useAppData() {
             const result = await requestBootstrap();
             setDirectoryMembers(result.members || []);
             setAdminMembers(mergeSheetMembers(result.members || [], result.histories || []));
-            setAdminHistories(result.histories || []);
             setAdminSchedules(normalizeSchedules(result.schedules || []));
             setAdminPasses(result.passes || []);
+            setAdminSettlements(result.settlements || []);
             setLoadError('');
         } catch (error) {
             console.error('데이터를 갱신하지 못했습니다:', error);
@@ -28,16 +28,15 @@ export function useAppData() {
 
     useEffect(() => {
         let active = true;
-        setIsLoading(true);
 
         requestBootstrap()
             .then((result) => {
                 if (!active) return;
                 setDirectoryMembers(result.members || []);
                 setAdminMembers(mergeSheetMembers(result.members || [], result.histories || []));
-                setAdminHistories(result.histories || []);
                 setAdminSchedules(normalizeSchedules(result.schedules || []));
                 setAdminPasses(result.passes || []);
+                setAdminSettlements(result.settlements || []);
                 setLoadError('');
             })
             .catch((error) => {
@@ -59,11 +58,12 @@ export function useAppData() {
     return {
         directoryMembers,
         adminMembers,
-        adminHistories,
         adminSchedules,
         setAdminSchedules,
         adminPasses,
         setAdminPasses,
+        adminSettlements,
+        setAdminSettlements,
         isLoading,
         setIsLoading,
         loadError,

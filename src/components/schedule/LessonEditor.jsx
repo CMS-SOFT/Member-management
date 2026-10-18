@@ -1,15 +1,22 @@
 import { useState } from 'react';
-import { timeOptions, snapToHalfHour, isCompletedLesson } from '../../lib/sheet';
+import { hourOptions, minuteOptions, snapToTwentyMinutes, isCompletedLesson, lessonOverlapMessage } from '../../lib/sheet';
 import { useDraggable } from '../../lib/useDraggable';
 import { Backdrop } from '../common';
 
 export function LessonEditor({ lesson, members, lessons = [], passSummaryOf, onClose, onSave, onDelete }) {
-  const [form, setForm] = useState({ ...lesson, time: snapToHalfHour(lesson.time) });
+  const [form, setForm] = useState({ ...lesson, time: snapToTwentyMinutes(lesson.time) });
   const [confirm, setConfirm] = useState('');
   const [done, setDone] = useState('');
   const [overlapWarning, setOverlapWarning] = useState('');
   const { dragHandleProps, style } = useDraggable();
   const changeField = (event) => setForm((currentForm) => ({ ...currentForm, [event.target.name]: event.target.value }));
+  const changeTimePart = (part, value) => {
+    const [hour, minute] = form.time.split(':');
+    setForm((currentForm) => ({
+      ...currentForm,
+      time: part === 'hour' ? `${value}:${minute}` : `${hour}:${value}`,
+    }));
+  };
   const isExisting = Boolean(form.id || form.rowNumber);
 
   // 레슨 상태 판정
@@ -21,15 +28,20 @@ export function LessonEditor({ lesson, members, lessons = [], passSummaryOf, onC
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const isFuture = String(form.date || '') > todayStr;
 
-  const findOverlap = () => lessons.find((item) =>
-    item.date === form.date
-    && snapToHalfHour(item.time) === form.time
-    && String(item.id) !== String(form.id));
-
   const requestSave = () => {
     if (finished) return;
-    const overlap = findOverlap();
-    if (overlap) { setOverlapWarning(`${form.date} ${form.time}에는 이미 ${overlap.name || '다른'} 회원 일정이 있어요.`); return; }
+    const selected = members.find((item) => item.name === form.name);
+    const overlap = lessonOverlapMessage({
+      date: form.date,
+      time: form.time,
+      newLessonType: selected?.lessonType || '개인',
+      newMemberName: form.name,
+      existing: lessons,
+      members,
+      excludeId: form.id,
+      excludeName: form.name,
+    });
+    if (overlap) { setOverlapWarning(overlap); return; }
     setConfirm('save');
   };
 
@@ -74,10 +86,11 @@ export function LessonEditor({ lesson, members, lessons = [], passSummaryOf, onC
     {/* 완료(finished)된 레슨만 전체 필드 비활성화, 미래 날짜라고 흐리게 만들지 않음 */}
     <fieldset disabled={finished} style={{ border: 'none', padding: 0, margin: 0 }}>
       <div className="editor-card">
-        <label>날짜<input type="date" name="date" value={form.date} onChange={changeField} /></label>
-        <label>시간<select name="time" value={form.time} onChange={changeField}>{timeOptions.map((time) => <option key={time} value={time}>{time}</option>)}</select></label>
-        <label>회원<select name="name" value={form.name} onChange={changeField} disabled={isExisting}><option value="">회원을 골라 주세요</option>{members.map((member) => <option key={member.name}>{member.name}</option>)}</select></label>
-        <label>상태<select name="status" value={form.status} onChange={changeField}><option>예약</option><option>진행중</option><option>완료</option><option>취소</option></select></label>
+        <label className="editor-date">날짜<input type="date" name="date" value={form.date} onChange={changeField} /></label>
+        <label className="editor-hour">시간<select value={form.time.split(':')[0]} onChange={(event) => changeTimePart('hour', event.target.value)}>{hourOptions.map((hour) => <option key={hour} value={hour}>{hour}시</option>)}</select></label>
+        <label className="editor-minute">분<select value={form.time.split(':')[1]} onChange={(event) => changeTimePart('minute', event.target.value)}>{minuteOptions.map((minute) => <option key={minute} value={minute}>{minute}분</option>)}</select></label>
+        <label className="editor-member">회원<select name="name" value={form.name} onChange={changeField} disabled={isExisting}><option value="">회원을 골라 주세요</option>{members.map((member) => <option key={member.name}>{member.name}</option>)}</select></label>
+        <label className="editor-status">상태<select name="status" value={form.status} onChange={changeField}><option>예약</option><option>진행중</option><option>완료</option><option>취소</option></select></label>
         <label className="editor-note">
           레슨 진행횟수 / 총 레슨횟수
           <div className="editor-pass">
@@ -106,6 +119,6 @@ export function LessonEditor({ lesson, members, lessons = [], passSummaryOf, onC
 
     {confirm && <div className="detail-confirm"><div className="confirm-modal"><h3>{confirmText.title}</h3><p>{confirmText.desc}</p><div className="modal-actions"><button className="cancel-button" onClick={() => setConfirm('')}>취소</button><button className={confirm === 'delete' ? 'delete-button' : 'primary-button'} onClick={runConfirm}>확인</button></div></div></div>}
     {done && <div className="detail-confirm"><div className="confirm-modal confirm-modal--result"><h3>{done}</h3><div className="modal-actions modal-actions--single"><button className="primary-button" onClick={() => (doneCloses ? onClose() : setDone(''))}>확인</button></div></div></div>}
-    {overlapWarning && <div className="detail-confirm"><div className="confirm-modal confirm-modal--result"><h3>⚠️ 이 시간에 다른 회원 일정이 있어요</h3><p>{overlapWarning}</p><div className="modal-actions modal-actions--single"><button className="primary-button" onClick={() => setOverlapWarning('')}>확인</button></div></div></div>}
+    {overlapWarning && <div className="detail-confirm"><div className="confirm-modal confirm-modal--result"><h3>이 시간에 일정을 넣을 수 없어요</h3><p style={{ whiteSpace: 'pre-line' }}>{overlapWarning}</p><div className="modal-actions modal-actions--single"><button className="primary-button" onClick={() => setOverlapWarning('')}>확인</button></div></div></div>}
   </div></Backdrop>;
 }

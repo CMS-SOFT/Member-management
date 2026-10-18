@@ -39,13 +39,46 @@ export function isCompletedLesson(lesson) {
   return ['완료', '정상', '출석', '퇴실'].includes(String(lesson.status || '').trim());
 }
 
-// 30분 단위 시간 옵션 및 스냅 헬퍼
-export const timeOptions = Array.from({ length: 48 }, (_, index) => `${String(Math.floor(index / 2)).padStart(2, '0')}:${index % 2 === 0 ? '00' : '30'}`);
-export function snapToHalfHour(value) {
+export const hourOptions = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'));
+export const minuteOptions = ['00', '20', '40'];
+export const timeOptions = hourOptions.flatMap((hour) => minuteOptions.map((minute) => `${hour}:${minute}`));
+
+export function snapToTwentyMinutes(value) {
   const time = normalizeScheduleTime(value);
   const match = /^(\d{2}):(\d{2})$/.exec(time);
   if (!match) return '10:00';
-  return `${match[1]}:${Number(match[2]) < 30 ? '00' : '30'}`;
+  const totalMinutes = Number(match[1]) * 60 + Number(match[2]);
+  const snappedMinutes = Math.round(totalMinutes / 20) * 20;
+  const minutesInDay = snappedMinutes % (24 * 60);
+  return `${String(Math.floor(minutesInDay / 60)).padStart(2, '0')}:${String(minutesInDay % 60).padStart(2, '0')}`;
+}
+
+export const GROUP_LESSON_LIMIT = 2;
+
+export function lessonOverlapMessage({ date, time, newLessonType, newMemberName, existing, members = [], excludeId, excludeName }) {
+  const memberType = (name) => {
+    const found = (members || []).find((item) => item.name === name);
+    return found?.lessonType || '개인';
+  };
+  const others = (existing || []).filter((item) => {
+    if (excludeName && item.name === excludeName) return false;
+    if (excludeId != null && String(item.id) === String(excludeId)) return false;
+    return item.date === date && snapToTwentyMinutes(item.time) === snapToTwentyMinutes(time);
+  });
+  if (!others.length) return '';
+
+  const hasPersonal = others.some((item) => (item.lessonType || memberType(item.name)) === '개인');
+  if (hasPersonal) {
+    const existingName = others[0].name || '기존 회원';
+    return `${date} ${time}\n ${existingName}님의 개인레슨이 존재합니다.`;
+  }
+  if (newLessonType !== '단체') {
+    return `${newMemberName || '신규회원'}님, 단체레슨만 등록 가능합니다.`;
+  }
+  if (others.length >= GROUP_LESSON_LIMIT) {
+    return '시간대에 단체레슨 인원만료로 이용불가합니다.';
+  }
+  return '';
 }
 
 // 요일 라벨(0=일 ~ 6=토). 반복 스케줄 요일 선택 UI에서 사용합니다.
