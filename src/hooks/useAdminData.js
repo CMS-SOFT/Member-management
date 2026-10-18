@@ -27,7 +27,6 @@ export function useAdminData({
 
   const [scheduleFilter, setScheduleFilter] = useState('전체');
   const [scheduleView, setScheduleView] = useState('calendar');
-  const [archiveTarget, setArchiveTarget] = useState(null);
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [reregisterMember, setReregisterMember] = useState(null);
   const [isClearConfirm, setIsClearConfirm] = useState(false);
@@ -300,7 +299,6 @@ export function useAdminData({
     setToast: setCenterAlert,
     scheduleFilter, setScheduleFilter,
     scheduleView, setScheduleView,
-    archiveTarget, setArchiveTarget,
     isArchiveOpen, setIsArchiveOpen,
     reregisterMember, setReregisterMember,
     isClearConfirm, setIsClearConfirm,

@@ -143,224 +143,245 @@ function dbTransaction(work, callback) {
         try { db.run('ROLLBACK'); } catch (rollbackError) { /* Transaction already closed. */ }
         callback(err);
     }
+}
 
-    function rowsForArchive(query) {
-        const statement = db.prepare(query);
-        const rows = [];
-        try {
-            while (statement.step()) rows.push(statement.getAsObject());
-        } finally {
-            statement.free();
-        }
-        return rows;
+function rowsForArchive(query) {
+    const statement = db.prepare(query);
+    const rows = [];
+    try {
+        while (statement.step()) rows.push(statement.getAsObject());
+    } finally {
+        statement.free();
     }
+    return rows;
+}
 
-    function archiveDateYear(value) {
-        const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
-        if (!match) return null;
-        const [, yearText, monthText, dayText] = match;
-        const year = Number(yearText);
-        const month = Number(monthText);
-        const day = Number(dayText);
-        const date = new Date(year, month - 1, day);
-        if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-        return year;
-    }
+function archiveDateYear(value) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
+    if (!match) return null;
+    const [, yearText, monthText, dayText] = match;
+    const year = Number(yearText);
+    const month = Number(monthText);
+    const day = Number(dayText);
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+    return year;
+}
 
-    function csvEscape(value) {
-        const text = value == null ? '' : String(value);
-        return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-    }
+function csvEscape(value) {
+    const text = value == null ? '' : String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
 
-    function rowsToCsv(columns, rows) {
-        const lines = [columns.map(csvEscape).join(',')];
-        rows.forEach((row) => lines.push(columns.map((column) => csvEscape(row[column])).join(',')));
-        return `\uFEFF${lines.join('\r\n')}\r\n`;
-    }
+function rowsToCsv(columns, rows) {
+    const lines = [columns.map(csvEscape).join(',')];
+    rows.forEach((row) => lines.push(columns.map((column) => csvEscape(row[column])).join(',')));
+    return `\uFEFF${lines.join('\r\n')}\r\n`;
+}
 
-    function parseCsvRows(text) {
-        const input = String(text || '').replace(/^\uFEFF/, '');
-        const rows = [];
-        let row = [];
-        let cell = '';
-        let quoted = false;
-        for (let index = 0; index < input.length; index += 1) {
-            const character = input[index];
-            if (quoted) {
-                if (character === '"' && input[index + 1] === '"') {
-                    cell += '"';
-                    index += 1;
-                } else if (character === '"') {
-                    quoted = false;
-                } else {
-                    cell += character;
-                }
-            } else if (character === '"' && cell.length === 0) {
-                quoted = true;
-            } else if (character === ',') {
-                row.push(cell);
-                cell = '';
-            } else if (character === '\n' || character === '\r') {
-                if (character === '\r' && input[index + 1] === '\n') index += 1;
-                row.push(cell);
-                if (row.some((value) => value !== '')) rows.push(row);
-                row = [];
-                cell = '';
+function parseCsvRows(text) {
+    const input = String(text || '').replace(/^\uFEFF/, '');
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    for (let index = 0; index < input.length; index += 1) {
+        const character = input[index];
+        if (quoted) {
+            if (character === '"' && input[index + 1] === '"') {
+                cell += '"';
+                index += 1;
+            } else if (character === '"') {
+                quoted = false;
             } else {
                 cell += character;
             }
-        }
-        if (quoted) throw new Error('아카이브 CSV의 따옴표 형식이 올바르지 않습니다.');
-        if (row.length || cell) {
+        } else if (character === '"' && cell.length === 0) {
+            quoted = true;
+        } else if (character === ',') {
+            row.push(cell);
+            cell = '';
+        } else if (character === '\n' || character === '\r') {
+            if (character === '\r' && input[index + 1] === '\n') index += 1;
             row.push(cell);
             if (row.some((value) => value !== '')) rows.push(row);
+            row = [];
+            cell = '';
+        } else {
+            cell += character;
         }
-        return rows;
     }
-
-    function csvFileRows(filePath, columns, required = false) {
-        if (!fs.existsSync(filePath)) {
-            if (required) throw new Error(`아카이브 CSV 파일이 없습니다: ${filePath}`);
-            return [];
-        }
-        const parsed = parseCsvRows(fs.readFileSync(filePath, 'utf8'));
-        if (!parsed.length || parsed[0].join('\0') !== columns.join('\0')) {
-            throw new Error(`아카이브 CSV의 열 구성이 올바르지 않습니다: ${filePath}`);
-        }
-        return parsed.slice(1).map((values) => Object.fromEntries(
-            columns.map((column, index) => [column, values[index] ?? ''])
-        ));
+    if (quoted) throw new Error('아카이브 CSV의 따옴표 형식이 올바르지 않습니다.');
+    if (row.length || cell) {
+        row.push(cell);
+        if (row.some((value) => value !== '')) rows.push(row);
     }
+    return rows;
+}
 
-    function installArchiveYear(year, tables) {
-        const archiveRoot = path.join(path.dirname(dbFile), 'archives');
-        const stagingPath = path.join(archiveRoot, `.staging-${year}-${process.pid}-${Date.now()}`);
-        const destinationPath = path.join(archiveRoot, String(year));
-        const previousPath = path.join(archiveRoot, `.previous-${year}-${process.pid}-${Date.now()}`);
-        fs.mkdirSync(stagingPath, { recursive: true });
+function csvFileRows(filePath, columns, required = false) {
+    if (!fs.existsSync(filePath)) {
+        if (required) throw new Error(`아카이브 CSV 파일이 없습니다: ${filePath}`);
+        return [];
+    }
+    const parsed = parseCsvRows(fs.readFileSync(filePath, 'utf8'));
+    if (
+        !parsed.length ||
+        parsed[0].join('\0') !== columns.join('\0') ||
+        parsed.slice(1).some((row) => row.length !== columns.length)
+    ) {
+        throw new Error(`아카이브 CSV의 열 구성이 올바르지 않습니다: ${filePath}`);
+    }
+    return parsed.slice(1).map((values) => Object.fromEntries(
+        columns.map((column, index) => [column, values[index] ?? ''])
+    ));
+}
 
+function installArchiveYear(year, tables) {
+    const archiveRoot = path.join(path.dirname(dbFile), 'archives');
+    const stagingPath = path.join(archiveRoot, `.staging-${year}-${process.pid}-${Date.now()}`);
+    const destinationPath = path.join(archiveRoot, String(year));
+    const previousPath = path.join(archiveRoot, `.previous-${year}-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(stagingPath, { recursive: true });
+
+    try {
+        ARCHIVE_TABLES.forEach(({ name }) => {
+            const columns = tables[name].columns;
+            const existingRows = csvFileRows(
+                path.join(destinationPath, `${name}.csv`),
+                columns,
+                fs.existsSync(destinationPath)
+            );
+            const mergedRows = new Map(existingRows.map((row) => [String(row.id), row]));
+            tables[name].rows.forEach((row) => mergedRows.set(String(row.id), row));
+            const rows = [...mergedRows.values()];
+            const csv = rowsToCsv(columns, rows);
+            const filePath = path.join(stagingPath, `${name}.csv`);
+            fs.writeFileSync(filePath, csv, 'utf8');
+            if (fs.readFileSync(filePath, 'utf8') !== csv || parseCsvRows(csv).length !== rows.length + 1) {
+                throw new Error(`아카이브 CSV 검증에 실패했습니다: ${year}/${name}.csv`);
+            }
+        });
+
+        let movedPrevious = false;
+        if (fs.existsSync(destinationPath)) {
+            fs.renameSync(destinationPath, previousPath);
+            movedPrevious = true;
+        }
         try {
-            ARCHIVE_TABLES.forEach(({ name }) => {
-                const columns = tables[name].columns;
-                const existingRows = csvFileRows(
-                    path.join(destinationPath, `${name}.csv`),
-                    columns,
-                    fs.existsSync(destinationPath)
-                );
-                const mergedRows = new Map(existingRows.map((row) => [String(row.id), row]));
-                tables[name].rows.forEach((row) => mergedRows.set(String(row.id), row));
-                const rows = [...mergedRows.values()];
-                const csv = rowsToCsv(columns, rows);
-                const filePath = path.join(stagingPath, `${name}.csv`);
-                fs.writeFileSync(filePath, csv, 'utf8');
-                if (fs.readFileSync(filePath, 'utf8') !== csv || parseCsvRows(csv).length !== rows.length + 1) {
-                    throw new Error(`아카이브 CSV 검증에 실패했습니다: ${year}/${name}.csv`);
-                }
-            });
-
-            let movedPrevious = false;
-            if (fs.existsSync(destinationPath)) {
-                fs.renameSync(destinationPath, previousPath);
-                movedPrevious = true;
-            }
-            try {
-                fs.renameSync(stagingPath, destinationPath);
-            } catch (err) {
-                if (movedPrevious) fs.renameSync(previousPath, destinationPath);
-                throw err;
-            }
-            if (movedPrevious) fs.rmSync(previousPath, { recursive: true, force: true });
-        } finally {
-            if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
-        }
-    }
-
-    function archiveExpiredData() {
-        const cutoffYear = new Date().getFullYear() - 2;
-        const archiveRoot = path.join(path.dirname(dbFile), 'archives');
-        const tableRows = Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => {
-            const columns = db.exec(`PRAGMA table_info(${name})`)[0]?.values.map((column) => column[1]) || [];
-            return [name, { columns, rows: [] }];
-        }));
-        const rowsByYear = new Map();
-        const deletedIds = Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => [name, new Set()]));
-        const ensureYear = (year) => {
-            if (!rowsByYear.has(year)) {
-                rowsByYear.set(year, Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => [name, []])));
-            }
-            return rowsByYear.get(year);
-        };
-        const addRow = (tableName, row, year) => {
-            ensureYear(year)[tableName].push(row);
-            if (row.id != null) deletedIds[tableName].add(row.id);
-        };
-
-        const datedTables = ARCHIVE_TABLES.filter(({ dateColumn }) => dateColumn);
-        const latestActivityYear = new Map();
-        datedTables.forEach(({ name, dateColumn }) => {
-            const rows = rowsForArchive(`SELECT * FROM ${name}`);
-            tableRows[name].rows = rows;
-            rows.forEach((row) => {
-                const year = archiveDateYear(row[dateColumn]);
-                if (year != null && row.member_id != null) {
-                    const memberId = String(row.member_id);
-                    latestActivityYear.set(memberId, Math.max(latestActivityYear.get(memberId) || 0, year));
-                }
-                if (year != null && year <= cutoffYear) addRow(name, row, year);
-            });
-        });
-
-        const memberRows = rowsForArchive(`SELECT * FROM members`);
-        tableRows.members.rows = memberRows;
-        const archivedMemberYears = new Map();
-        memberRows.forEach((member) => {
-            const activityYear = latestActivityYear.get(String(member.id));
-            if (member.role !== '관리자' && activityYear != null && activityYear <= cutoffYear) {
-                archivedMemberYears.set(String(member.id), activityYear);
-                addRow('members', member, activityYear);
-            }
-        });
-
-        ['member_lessons', 'passes'].forEach((name) => {
-            const { dateColumn } = ARCHIVE_TABLES.find((table) => table.name === name);
-            const rows = rowsForArchive(`SELECT * FROM ${name}`);
-            tableRows[name].rows = rows;
-            rows.forEach((row) => {
-                if (archiveDateYear(row[dateColumn]) != null || row.member_id == null) return;
-                const activityYear = archivedMemberYears.get(String(row.member_id));
-                if (activityYear != null) addRow(name, row, activityYear);
-            });
-        });
-
-        const archiveYears = [...rowsByYear.keys()].sort((left, right) => left - right);
-        if (!archiveYears.length) return;
-        fs.mkdirSync(archiveRoot, { recursive: true });
-        archiveYears.forEach((year) => installArchiveYear(year, Object.fromEntries(
-            ARCHIVE_TABLES.map(({ name }) => [name, { columns: tableRows[name].columns, rows: rowsByYear.get(year)[name] }])
-        )));
-
-        const snapshot = db.export();
-        try {
-            db.run('BEGIN TRANSACTION');
-            ARCHIVE_TABLES.forEach(({ name }) => {
-                const ids = [...deletedIds[name]];
-                for (let offset = 0; offset < ids.length; offset += 500) {
-                    const batch = ids.slice(offset, offset + 500);
-                    db.run(`DELETE FROM ${name} WHERE id IN (${batch.map(() => '?').join(',')})`, batch);
-                }
-            });
-            db.run('COMMIT');
-            saveDb();
+            fs.renameSync(stagingPath, destinationPath);
         } catch (err) {
-            try { db.run('ROLLBACK'); } catch (rollbackError) { /* Transaction may already be committed. */ }
-            db.close();
-            db = new SQL.Database(snapshot);
+            if (movedPrevious) fs.renameSync(previousPath, destinationPath);
             throw err;
         }
-        console.log(`✅ 과거 기록 아카이브 완료: ${archiveYears.join(', ')}년 자료`);
+        if (movedPrevious) {
+            try {
+                fs.rmSync(previousPath, { recursive: true, force: true });
+            } catch (err) {
+                console.error(`❌ 이전 아카이브 임시 폴더를 정리하지 못했습니다: ${previousPath}`, err);
+            }
+        }
+    } finally {
+        if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
     }
 }
 
+function archiveExpiredData() {
+    const cutoffYear = new Date().getFullYear() - 2;
+    const archiveRoot = path.join(path.dirname(dbFile), 'archives');
+    const tableRows = Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => {
+        const columns = db.exec(`PRAGMA table_info(${name})`)[0]?.values.map((column) => column[1]) || [];
+        return [name, { columns, rows: [] }];
+    }));
+    const rowsByYear = new Map();
+    const deletedIds = Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => [name, new Set()]));
+    const invalidDatedRows = [];
+    const ensureYear = (year) => {
+        if (!rowsByYear.has(year)) {
+            rowsByYear.set(year, Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => [name, []])));
+        }
+        return rowsByYear.get(year);
+    };
+    const addRow = (tableName, row, year) => {
+        ensureYear(year)[tableName].push(row);
+        if (row.id != null) deletedIds[tableName].add(row.id);
+    };
+
+    const datedTables = ARCHIVE_TABLES.filter(({ dateColumn }) => dateColumn);
+    const latestActivityYear = new Map();
+    datedTables.forEach(({ name, dateColumn }) => {
+        const rows = rowsForArchive(`SELECT * FROM ${name}`);
+        tableRows[name].rows = rows;
+        rows.forEach((row) => {
+            const year = archiveDateYear(row[dateColumn]);
+            if (row[dateColumn] && year == null) invalidDatedRows.push({ table: name, id: row.id });
+            if (year != null && row.member_id != null) {
+                const memberId = String(row.member_id);
+                latestActivityYear.set(memberId, Math.max(latestActivityYear.get(memberId) || 0, year));
+            }
+            if (year != null && year <= cutoffYear) addRow(name, row, year);
+        });
+    });
+
+    const memberRows = rowsForArchive(`SELECT * FROM members`);
+    tableRows.members.rows = memberRows;
+    const archivedMemberYears = new Map();
+    memberRows.forEach((member) => {
+        const activityYear = latestActivityYear.get(String(member.id));
+        const isAdmin = member.role === '관리자' || member.name === '관리자';
+        if (!isAdmin && activityYear != null && activityYear <= cutoffYear) {
+            archivedMemberYears.set(String(member.id), activityYear);
+            addRow('members', member, activityYear);
+        }
+    });
+
+    ['member_lessons', 'passes'].forEach((name) => {
+        const { dateColumn } = ARCHIVE_TABLES.find((table) => table.name === name);
+        const rows = rowsForArchive(`SELECT * FROM ${name}`);
+        tableRows[name].rows = rows;
+        rows.forEach((row) => {
+            if (archiveDateYear(row[dateColumn]) != null || row.member_id == null) return;
+            const activityYear = archivedMemberYears.get(String(row.member_id));
+            if (activityYear != null) addRow(name, row, activityYear);
+        });
+    });
+
+    const unclassifiedDates = invalidDatedRows.filter(({ table, id }) => !deletedIds[table].has(id));
+    if (unclassifiedDates.length) {
+        const counts = unclassifiedDates.reduce((result, { table }) => {
+            result[table] = (result[table] || 0) + 1;
+            return result;
+        }, {});
+        console.warn('⚠️ 날짜 형식이 올바르지 않은 기록은 아카이브하지 않고 DB에 유지합니다:', counts);
+    }
+
+    const archiveYears = [...rowsByYear.keys()].sort((left, right) => left - right);
+    if (!archiveYears.length) return;
+    fs.mkdirSync(archiveRoot, { recursive: true });
+    archiveYears.forEach((year) => installArchiveYear(year, Object.fromEntries(
+        ARCHIVE_TABLES.map(({ name }) => [name, { columns: tableRows[name].columns, rows: rowsByYear.get(year)[name] }])
+    )));
+
+    const snapshot = db.export();
+    try {
+        db.run('BEGIN TRANSACTION');
+        ARCHIVE_TABLES.forEach(({ name }) => {
+            const ids = [...deletedIds[name]];
+            for (let offset = 0; offset < ids.length; offset += 500) {
+                const batch = ids.slice(offset, offset + 500);
+                db.run(`DELETE FROM ${name} WHERE id IN (${batch.map(() => '?').join(',')})`, batch);
+            }
+        });
+        db.run('COMMIT');
+        saveDb();
+    } catch (err) {
+        try { db.run('ROLLBACK'); } catch (rollbackError) { /* Transaction may already be committed. */ }
+        db.close();
+        db = new SQL.Database(snapshot);
+        throw err;
+    }
+    console.log(`✅ 과거 기록 아카이브 완료: ${archiveYears.join(', ')}년 자료`);
+}
 // 5. prepare / stmt 호환 객체
 function dbPrepare(query) {
     return {

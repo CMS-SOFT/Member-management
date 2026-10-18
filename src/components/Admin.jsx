@@ -100,7 +100,7 @@ function AdminClearConfirmModal({ members = [], onConfirm, onCancel }) {
 }
 
 // 통합된 자료 관리 드롭다운 컴포넌트
-function IntegratedCsvTools({ passes, members, schedules, onImported, onError, onArchiveExport, onArchiveView, onClearData, apiRequest }) {
+function IntegratedCsvTools({ passes, members, schedules, onImported, onError, onArchiveView, onClearData, apiRequest }) {
   const [isOpen, setIsOpen] = useState(false);
   const [importingType, setImportingType] = useState(null);
   const menuRef = useRef(null);
@@ -315,14 +315,13 @@ function IntegratedCsvTools({ passes, members, schedules, onImported, onError, o
 
           <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '2px 0' }} />
 
-          {/* 지난 기록 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333' }}>지난 기록</span>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <button onClick={() => { onArchiveExport?.(); setIsOpen(false); }} style={dropdownBtnStyle}>보관하기</button>
-              <button onClick={() => { onArchiveView?.(); setIsOpen(false); }} style={dropdownBtnStyle}>다시 보기</button>
-            </div>
-          </div>
+          <button
+            className="archive-menu-btn"
+            onClick={() => { onArchiveView?.(); setIsOpen(false); }}
+            style={dropdownBtnStyle}
+          >
+            과거 기록 보기
+          </button>
 
           <hr style={{ border: 'none', borderTop: '1px solid #eee', margin: '2px 0' }} />
 
@@ -377,7 +376,6 @@ export function Admin({
             schedules={lessons}
             onImported={data.handleImported}
             onError={data.setSyncError}
-            onArchiveExport={data.runArchiveExport}
             onArchiveView={() => data.setIsArchiveOpen(true)}
             onClearData={() => data.setIsClearConfirm(true)}
             apiRequest={apiRequest}
@@ -472,8 +470,6 @@ export function Admin({
 
       {data.isClearConfirm && <AdminClearConfirmModal members={members} onConfirm={data.confirmClearData} onCancel={() => data.setIsClearConfirm(false)} />}
       {data.isArchiveOpen && <ArchiveViewer onClose={() => data.setIsArchiveOpen(false)} />}
-      {data.archiveTarget && <div className="modal-backdrop"><div className="confirm-modal"><h3>목록에서 지울까요?</h3><p>{data.archiveTarget.year}년 지난 일정 {data.archiveTarget.count}개를 방금 파일로 저장했어요. 이 일정들을 지금 목록에서 지울까요? (지워도 저장한 파일에서 다시 볼 수 있어요.)</p><div className="modal-actions"><button className="cancel-button" onClick={() => data.setArchiveTarget(null)}>그냥 두기</button><button className="delete-button" onClick={data.confirmArchiveRemoval}>목록에서 지우기</button></div></div></div>}
-
       {/* 화면 중앙 모달 팝업 추가 */}
       {centerAlert && (
         <div className="modal-backdrop" onClick={() => setCenterAlert('')}>

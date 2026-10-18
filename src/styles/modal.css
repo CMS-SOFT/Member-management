@@ -218,14 +218,16 @@
 }
 
 /* 지난 기록 조회(읽기 전용) 모달 */
-.archive-viewer {
-    width: min(560px, 100%);
+.schedule-modal.archive-viewer {
+    width: min(700px, calc(100vw - 24px));
+    padding: 28px;
 }
 
 .archive-hint {
     margin: 4px 0 12px;
     color: var(--muted);
     font-size: 12px;
+    line-height: 1.6;
 }
 
 .archive-actions {
@@ -235,15 +237,46 @@
     margin-bottom: 12px;
 }
 
-.archive-filename {
+.archive-year-select {
+    min-width: 120px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid #d9c3ca;
+    color: var(--ink);
+    background: #fff;
+}
+
+.archive-row-count {
+    margin-left: auto;
     font-size: 12px;
-    color: #6f666b;
+    color: var(--muted);
+}
+
+.archive-empty {
+    padding: 24px 12px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 13px;
 }
 
 .archive-table-wrap {
     max-height: 50vh;
     overflow: auto;
     border: 1px solid #eee5e8;
+}
+
+.archive-table-section+.archive-table-section {
+    margin-top: 18px;
+}
+
+.archive-table-section h4 {
+    position: sticky;
+    left: 0;
+    margin: 0;
+    padding: 8px 12px;
+    color: var(--wine);
+    background: #fff5f7;
+    font-size: 13px;
 }
 
 .archive-table {
