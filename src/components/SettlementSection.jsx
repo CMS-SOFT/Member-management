@@ -171,7 +171,7 @@ export function SettlementSection({ members, settlements, selectedMonth, onMoveM
               const outside = date.getMonth() !== monthNumber - 1;
               const dayEntries = visibleEntries.filter((entry) => entry.date === fullDate);
               const archivedRows = entries.filter((entry) => entry.date === fullDate && entry.type === '월레슨비');
-              const dayCount = dayEntries.length + archivedRows.length;
+              const cellEntryCount = dayEntries.length + archivedRows.length;
               const dayTotal = dayEntries.concat(archivedRows).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
               return (
                 <button
@@ -181,7 +181,7 @@ export function SettlementSection({ members, settlements, selectedMonth, onMoveM
                   onClick={() => { if (!outside) openNewEntry(fullDate); }}
                 >
                   <strong>{date.getDate()}</strong>
-                  {dayCount > 0 && <span>{dayCount}건 · {formatWon(dayTotal)}</span>}
+                  {cellEntryCount > 0 && <span>{cellEntryCount}건 · {formatWon(dayTotal)}</span>}
                   {dayEntries.map((entry) => (
                     <span key={entry.id}>{entry.name} {formatWon(entry.amount)}</span>
                   ))}

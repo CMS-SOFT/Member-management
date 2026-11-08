@@ -22,7 +22,7 @@ export function ArchiveViewer({ onClose }) {
   const currentYear = new Date().getFullYear();
   const archiveBaseYear = currentYear - 2;
   // 선택 가능 연도: 현재 활성 2개년 직전부터 과거로 5개년
-  const defaultYears = Array.from({ length: 5 }, (_, i) => String(archiveBaseYear - 1 - i));
+  const defaultYears = Array.from({ length: 5 }, (_, i) => String(archiveBaseYear - i));
 
   const [years] = useState(defaultYears);
   const [selectedYear, setSelectedYear] = useState(defaultYears[0]);
