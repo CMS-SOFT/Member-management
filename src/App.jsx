@@ -40,7 +40,7 @@ function App() {
     }
   };
 
-  // court mate 브랜드 버튼 — 로그인 상태면 현재 화면 유지, 아니면 홈으로
+  // court mate 브랜드 버튼 — 스크롤 상단으로
   const goTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -84,20 +84,20 @@ function App() {
   };
 
   return (
-    <main className="app-shell">
-      <section className="app-window">
+    <div className="app-shell">
+      <div className="app-window">
         <header className="app-header">
-          <button className="brand" onClick={goTop}>
+          <button className="brand-btn" onClick={goTop}>
             <span className="brand-mark">✦</span>
             <span>court mate</span>
           </button>
           <div className="app-header-actions">
-            <button className="home-label" onClick={() => setIsManualOpen(true)}>사용설명서</button>
-            <button className="home-label" onClick={goHome}>홈으로</button>
+            <button className="manual-btn" onClick={() => setIsManualOpen(true)}>사용설명서</button>
+            <button className="home-btn" onClick={goHome}>홈으로</button>
           </div>
         </header>
 
-        <div className="app-content">
+        <main className="app-content">
           {screen === 'login' ? (
             <Login
               onLogin={handleLogin}
@@ -119,12 +119,12 @@ function App() {
               sheetLoadError={loadError}
             />
           )}
-        </div>
+        </main>
 
         <footer className="app-footer">Tennis attendance desk</footer>
         {isManualOpen && <UserManual onClose={() => setIsManualOpen(false)} />}
-      </section>
-    </main>
+      </div>
+    </div>
   );
 }
 

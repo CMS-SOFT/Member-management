@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAdminData } from '../hooks/useAdminData';
-import { PageTitle, Summary } from './common';
 import { ArchiveViewer } from './ArchiveViewer';
 import { MemberDetail } from './member/MemberDetail';
 import { MemberRegister } from './member/MemberRegister';
@@ -257,13 +256,14 @@ function IntegratedCsvTools({ passes, members, schedules, onImported, onError, o
       />
 
       <button
+        className="data-manage-btn"
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          backgroundColor: '#fff',
-          border: '1px solid #ccc',
+          backgroundColor: '#f0f0f0',
+          border: '1px solid #d0d0d0',
           borderRadius: '4px',
-          padding: '6px 14px',
-          fontSize: '12px',
+          padding: '8px 16px',
+          fontSize: '14px',
           fontWeight: '600',
           fontFamily: 'inherit',
           cursor: 'pointer',
@@ -366,10 +366,9 @@ export function Admin({
 
   return (
     <div className="admin-dashboard">
-      <PageTitle
-        eyebrow=""
-        title="관리자 코치님 반갑습니다."
-        actions={
+      <div className="admin-header-bar">
+        <span className="admin-greeting">관리자님 환영합니다.</span>
+        <div className="admin-actions">
           <IntegratedCsvTools
             passes={passList}
             members={members}
@@ -380,16 +379,25 @@ export function Admin({
             onClearData={() => data.setIsClearConfirm(true)}
             apiRequest={apiRequest}
           />
-        }
-      />
+        </div>
+      </div>
 
       {sheetLoadError && <div className="sheet-warning" role="alert">저장된 자료를 불러오지 못했어요. {sheetLoadError}</div>}
       {data.syncError && <div className="sheet-warning" role="alert">{data.syncError}</div>}
 
-      <div className="admin-summary">
-        <Summary icon="♙" label="총 회원 수" value={`${members.filter(m => m.role !== '관리자').length}명`} />
-        <Summary icon="▦" label={`${stats.label} 레슨 횟수(완료/전체)`} value={`${stats.lessonCountText}`} />
-        <Summary icon="✣" label={`${stats.label} 레슨 회원수`} value={`${stats.memberCount}명`} />
+      <div className="summary-cards-container">
+        <div className="summary-card">
+          <span className="card-label">총 회원 수</span>
+          <span className="card-value">{members.filter(m => m.role !== '관리자').length}명</span>
+        </div>
+        <div className="summary-card">
+          <span className="card-label">{stats.label} 레슨 횟수(완료/전체)</span>
+          <span className="card-value">{stats.lessonCountText}</span>
+        </div>
+        <div className="summary-card">
+          <span className="card-label">{stats.label} 레슨 회원수</span>
+          <span className="card-value">{stats.memberCount}명</span>
+        </div>
       </div>
 
       <nav className="admin-tabs" aria-label="관리자 메뉴" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -407,7 +415,7 @@ export function Admin({
         </div>
 
         {/* 우측에 항상 고정될 회원 등록 버튼 */}
-        <button className="add-button" onClick={() => data.setIsRegisterOpen(true)}>
+        <button className="member-register-btn" onClick={() => data.setIsRegisterOpen(true)}>
           <span>＋ 회원등록</span>
         </button>
       </nav>
@@ -447,7 +455,7 @@ export function Admin({
         />
       )}
 
-      {data.selectedMember && <MemberDetail member={data.selectedMember} schedules={lessons} passes={passList.filter((pass) => pass.name === data.selectedMember.name)} onSave={data.updateMember} onDelete={data.deleteMember} onAddPass={data.addPass} onDeletePass={data.removePass} onClose={() => data.setSelectedMember(null)} />}
+      {data.selectedMember && <MemberDetail member={data.selectedMember} adminMember={members.find((item) => item.role === '관리자' || item.name === '관리자')} schedules={lessons} passes={passList.filter((pass) => pass.name === data.selectedMember.name)} onSave={data.updateMember} onDelete={data.deleteMember} onAddPass={data.addPass} onDeletePass={data.removePass} onClose={() => data.setSelectedMember(null)} />}
 
       {/* 회원 등록 결과 메시지를 받아서 중앙 팝업으로 띄우고 완료 시 팝업 닫기 */}
       {data.isRegisterOpen && (

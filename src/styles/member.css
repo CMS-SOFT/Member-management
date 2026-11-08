@@ -13,7 +13,8 @@
     color: #6f666b;
 }
 
-.renotify-button {
+.renotify-button,
+.reregister-trigger-btn {
     padding: 5px 14px;
     border: 1px solid var(--wine);
     border-radius: 0;
@@ -26,7 +27,8 @@
     height: auto;
 }
 
-.renotify-button:hover {
+.renotify-button:hover,
+.reregister-trigger-btn:hover {
     opacity: .9;
 }
 
@@ -51,7 +53,7 @@
 .pass-list--cards {
     max-height: 300px;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
     overscroll-behavior: contain;
 }
 
@@ -67,15 +69,14 @@
 }
 
 .pass-card {
-    min-width: 0;
+    min-width: max-content;
 }
 
 .pass-card-view {
-    display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr);
+    display: flex;
     flex: 1 1 auto;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
     padding: 0;
     border: 0;
@@ -83,10 +84,13 @@
     background: transparent;
     text-align: left;
     white-space: nowrap;
+    flex-wrap: nowrap;
 }
 
 .pass-card-view b,
-.pass-card-view span {
+.pass-card-view span,
+.pass-card-view i {
+    flex: 0 0 auto;
     white-space: nowrap;
 }
 
@@ -94,8 +98,6 @@
     font-style: normal;
     font-weight: 700;
     color: #c88916;
-    text-align: right;
-    white-space: nowrap;
 }
 
 .pass-card.done .pass-card-view i {
@@ -103,7 +105,6 @@
 }
 
 .pass-view-label {
-    grid-column: 1 / -1;
     color: var(--wine);
     font-size: 10px;
     font-weight: 700;
@@ -156,45 +157,108 @@
     font-size: 11px;
 }
 
-.pass-add {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
+.pass-add-trigger {
+    width: 100%;
+    height: 36px;
     margin-top: 10px;
-}
-
-.pass-add label {
-    display: grid;
-    min-width: 0;
-    gap: 4px;
-    font-size: 10px;
-    font-weight: 800;
-    color: #6f666b;
     white-space: nowrap;
 }
 
-.pass-add input {
+.pass-add-backdrop {
+    z-index: 6;
+}
+
+.pass-add-modal {
+    width: min(560px, 100%);
+}
+
+.pass-add-modal .field {
+    margin: 14px 0;
+}
+
+.pass-add-modal .field input {
     width: 100%;
-    height: 34px;
+    height: 38px;
     padding: 0 10px;
     border: 1px solid #d9d1d4;
-    border-radius: 0;
-    font-size: 12px;
+    border-radius: 4px;
 }
 
-.pass-add select {
-    width: 100%;
-    height: 34px;
+.pass-add-slots {
+    display: grid;
+    gap: 8px;
+}
+
+.pass-add-slots-head,
+.pass-add-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pass-add-slots-head {
+    margin-bottom: 4px;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.pass-add-slots-head .member-add-btn {
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    background: #555;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.pass-add-slot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.pass-add-slot select {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+    height: 38px;
     padding: 0 8px;
     border: 1px solid #d9d1d4;
-    border-radius: 0;
+    border-radius: 4px;
     background: #fff;
+    font-size: 13px;
+}
+
+.pass-add-slot .member-del-btn {
+    flex: 0 0 auto;
+    height: 38px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    background: #a94442;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.pass-add-error {
+    margin-top: 12px;
+    color: #a2213f;
     font-size: 12px;
 }
 
-.pass-add .primary-button {
-    height: 34px;
-    grid-column: 1 / -1;
+.pass-add-actions {
+    justify-content: flex-end;
+    margin-top: 18px;
+}
+
+.pass-add-actions button {
+    min-height: 38px;
+    padding: 0 14px;
     white-space: nowrap;
 }
 

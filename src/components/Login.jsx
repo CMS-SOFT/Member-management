@@ -2,20 +2,17 @@ import { useState, useRef } from 'react';
 
 export function Login({ onLogin, error, loadError, onDismiss, isLoading }) {
   const [password, setPassword] = useState('');
-  const inputRef = useRef(null); // 커서를 다시 잡기 위한 ref
+  const inputRef = useRef(null);
   const displayError = loadError || error;
 
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' && !isLoading) {
       if (event.nativeEvent.isComposing) return; // 한글 입력 조합 중복 실행 방지
-
       onLogin(password);
     }
   };
 
   const handleLoginClick = () => {
-    // 👉 입력값 확인용 로그 추가
-    console.log("🔥 [Login] 로그인 버튼 클릭 - 입력된 패스워드:", password);
     onLogin(password);
   };
 
@@ -28,31 +25,27 @@ export function Login({ onLogin, error, loadError, onDismiss, isLoading }) {
   };
 
   return (
-    <div className="login-view">
-      <div className="login-intro">
-        <h1>court mate</h1>
-      </div>
-
+    <div className="login-container">
       <div className="login-card">
-        <label className="field">
+        <h1 className="login-title">court mate</h1>
+
+        <div className="input-group">
+          <label>비밀번호</label>
           <input
             ref={inputRef}
+            className="password-input"
             type="password"
             value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-              // 입력할 때마다 실시간으로 값이 바뀌는 걸 보고 싶다면 아래 주석을 해제하세요
-              // console.log("✍️ [Login] 타이핑 중:", event.target.value);
-            }}
+            onChange={(event) => setPassword(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="생년월일(yymmdd) + 전화번호 끝 4자리"
             autoFocus
           />
-        </label>
+        </div>
 
         <button
           type="button"
-          className="primary-button login-button"
+          className="login-submit-btn"
           disabled={isLoading}
           onClick={handleLoginClick}
         >

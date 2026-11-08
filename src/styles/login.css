@@ -1,7 +1,8 @@
 /* login.css — 로그인 화면 전용 (요청에 따라 문구/스타일 변경 금지) */
 
 /* 로그인 화면일 때 콘텐츠 영역을 세로로 채워, 창 높이에 맞게 가운데 정렬 */
-.app-content:has(.login-view) {
+.app-content:has(.login-view),
+.app-content:has(.login-container) {
     display: flex;
     flex-direction: column;
 }
@@ -15,6 +16,89 @@
     max-width: 520px;
     margin: 0 auto;
     text-align: center;
+}
+
+/* 가이드 규격: login-container */
+.login-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    width: 100%;
+}
+
+/* 가이드 규격: login-card (너비 360px, 패딩 32px) */
+.login-container .login-card {
+    width: 360px;
+    padding: 32px;
+    border: 1px solid #ead7db;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    text-align: left;
+    margin-top: 0;
+}
+
+/* 가이드 규격: login-title (court mate, 28px, 800, wine) */
+.login-title {
+    margin: 0 0 24px;
+    color: var(--wine);
+    font-size: 28px;
+    font-weight: 800;
+    font-family: Georgia, 'Times New Roman', serif;
+    text-align: center;
+}
+
+/* 가이드 규격: input-group */
+.input-group {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+/* 가이드 규격: password-input (높이 44px, 폰트 15px) */
+.password-input {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    color: var(--ink);
+    background: white;
+    font-size: 15px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.password-input:focus {
+    border-color: var(--wine);
+    box-shadow: 0 0 0 3px #91002f12;
+}
+
+/* 가이드 규격: login-submit-btn (너비 100%, 높이 48px, wine, 16px, 700) */
+.login-submit-btn {
+    width: 100%;
+    height: 48px;
+    border: 0;
+    border-radius: 4px;
+    color: #ffffff;
+    background: var(--wine);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.login-submit-btn:hover:not(:disabled) {
+    background: #7a0027;
+}
+
+.login-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .login-intro {
@@ -49,7 +133,7 @@
     font-size: 14px;
 }
 
-.login-card {
+.login-view .login-card {
     margin-top: 12px;
     padding: 22px 30px;
     border: 1px solid #ead7db;
@@ -131,9 +215,12 @@
         font-size: 30px;
     }
 
-    .login-card {
+    .login-view .login-card,
+    .login-container .login-card {
         margin-top: 14px;
         padding: 20px 18px;
+        width: 100%;
+        max-width: 360px;
     }
 
     .login-view .field input {
@@ -153,7 +240,8 @@
         font-size: 25px;
     }
 
-    .login-card {
+    .login-view .login-card,
+    .login-container .login-card {
         padding: 16px 14px;
     }
 

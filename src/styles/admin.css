@@ -13,6 +13,87 @@
     color: #262127;
 }
 
+/* 가이드 규격: admin-header-bar */
+.admin-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee8ea;
+}
+
+.admin-greeting {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.admin-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 가이드 규격: data-manage-btn */
+.data-manage-btn {
+    padding: 8px 16px;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    background: #f0f0f0;
+    color: #333;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* 가이드 규격: summary-cards-container (3개 카드 가로 플렉스) */
+.summary-cards-container {
+    display: flex;
+    gap: 16px;
+    margin: 18px 0 23px;
+}
+
+.summary-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px;
+    border: 1px solid var(--border-rose);
+    border-radius: 6px;
+    background: #ffffff;
+}
+
+.card-label {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.card-value {
+    color: var(--wine);
+    font-size: 22px;
+    font-weight: 700;
+}
+
+/* 가이드 규격: member-register-btn */
+.member-register-btn {
+    padding: 8px 16px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--wine);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.admin-dashboard {
+    margin: 0 auto;
+    color: #262127;
+}
+
 .sheet-warning {
     margin: 12px 0 -2px;
     padding: 10px 12px;
@@ -179,194 +260,26 @@
     color: #a2213f;
 }
 
-.settlement-controls-bar {
+.settlement-month-total {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    margin-bottom: 16px;
-}
-
-.settlement-left,
-.settlement-right {
-    display: flex;
-    flex: 1 1 0;
-    align-items: center;
-}
-
-.settlement-right {
-    justify-content: flex-end;
-}
-
-.settlement-member-select,
-.settlement-view-select {
-    height: 36px;
-    max-width: 100%;
-    padding: 0 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    color: var(--ink);
-    background: #fff;
-    font-size: 14px;
-}
-
-.settlement-member-select {
-    min-width: 150px;
-}
-
-.settlement-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
-}
-
-.settlement-center .month-switcher {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-}
-
-.settlement-center .month-switcher button {
-    width: 32px;
-    height: 32px;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    color: var(--ink);
-    background: #fff;
-    font-size: 18px;
-}
-
-.settlement-center .month-switcher strong {
-    min-width: 110px;
-    color: var(--ink);
-    font-size: 18px;
-    text-align: center;
-}
-
-.settlement-center .settlement-total {
+    justify-content: center;
     gap: 7px;
-    font-size: 12px;
+    margin-top: 12px;
+    font-size: 16px;
 }
 
-.settlement-center .settlement-total b {
+.settlement-month-total span {
+    color: var(--ink);
+}
+
+.settlement-month-total b {
+    color: var(--wine);
     font-size: 16px;
     font-weight: 700;
 }
 
-.settlement-section .settlement-actions {
-    justify-content: flex-end;
-    margin: 0 0 12px;
-}
-
-.settlement-calendar,
 .settlement-list-wrap {
     overflow-x: auto;
-}
-
-.settlement-weekdays,
-.settlement-calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 8px;
-    min-width: 700px;
-}
-
-.settlement-weekdays {
-    margin-bottom: 8px;
-    text-align: center;
-}
-
-.settlement-weekdays b {
-    padding: 5px;
-    color: var(--ink);
-    font-size: 13px;
-}
-
-.settlement-weekdays b:first-child {
-    color: #c00;
-}
-
-.settlement-weekdays b:last-child {
-    color: #00c;
-}
-
-.settlement-calendar-day {
-    min-width: 0;
-    min-height: 110px;
-    padding: 7px;
-    border: 1px solid var(--border-rose);
-    border-radius: 4px;
-    background: #fff;
-}
-
-.settlement-calendar-day.outside {
-    opacity: .4;
-}
-
-.settlement-day-number {
-    display: block;
-    margin: 0 0 5px;
-    padding: 0;
-    border: 0;
-    color: var(--ink);
-    background: transparent;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.settlement-day-number:not(:disabled) {
-    cursor: pointer;
-}
-
-.settlement-day-summary {
-    margin: 0 0 4px;
-    color: var(--wine);
-    font-size: 10px;
-    font-weight: 700;
-}
-
-.settlement-calendar-entry,
-.settlement-calendar-legacy {
-    display: flex;
-    width: 100%;
-    justify-content: space-between;
-    gap: 4px;
-    margin-top: 3px;
-    padding: 3px 4px;
-    overflow: hidden;
-    border: 0;
-    border-radius: 3px;
-    color: var(--ink);
-    background: #fff1f4;
-    font-size: 10px;
-    text-align: left;
-}
-
-.settlement-calendar-entry {
-    cursor: pointer;
-}
-
-.settlement-calendar-entry:disabled {
-    cursor: default;
-    opacity: .7;
-}
-
-.settlement-calendar-entry strong,
-.settlement-calendar-legacy strong {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.settlement-calendar-entry span,
-.settlement-calendar-legacy span {
-    flex: 0 0 auto;
-}
-
-.settlement-calendar-legacy {
-    color: #766f73;
-    background: #f2eff0;
 }
 
 .settlement-list-table {
@@ -403,7 +316,7 @@
 .settlement-popup {
     position: relative;
     width: min(420px, 100%);
-    max-height: calc(100vh - 40px);
+    max-height: 85vh;
     padding: 24px;
     overflow-y: auto;
     border: 1px solid var(--border-rose);
@@ -441,15 +354,15 @@
     color: var(--muted);
 }
 
-.settlement-editor > label {
+.settlement-editor>label {
     display: grid;
     gap: 6px;
     margin: 12px 0;
     font-size: 13px;
 }
 
-.settlement-editor > label input,
-.settlement-editor > label select {
+.settlement-editor>label input,
+.settlement-editor>label select {
     width: 100%;
     min-height: 38px;
     padding: 7px 9px;
@@ -548,6 +461,18 @@
 .member-table .member-name {
     color: var(--wine);
     font-weight: 800;
+}
+
+/* 가이드 규격: member-name-link */
+.member-name-link {
+    color: var(--wine);
+    font-weight: 800;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.member-name-link:hover {
+    text-decoration: underline;
 }
 
 .member-table .status {
@@ -736,27 +661,6 @@
 
     .admin-section {
         padding: 16px 10px;
-    }
-
-    .settlement-controls-bar {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .settlement-left,
-    .settlement-right {
-        flex: 1 1 calc(50% - 5px);
-    }
-
-    .settlement-center {
-        order: -1;
-        flex: 1 0 100%;
-    }
-
-    .settlement-member-select,
-    .settlement-view-select {
-        width: 100%;
-        min-width: 0;
     }
 
     .admin-calendar-day {

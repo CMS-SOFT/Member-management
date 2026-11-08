@@ -1,9 +1,7 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { hourOptions, minuteOptions } from '../../lib/sheet';
+import { hourOptions, minuteOptions, weekdayOptions } from '../../lib/sheet';
 import { Backdrop } from '../common';
-
-const WEEKDAYS = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
 
 function currentLocalDate() {
   const date = new Date();
@@ -104,8 +102,70 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
   );
 }
 
+function PassDeleteConfirm({ pass, adminMember, onConfirm, onCancel }) {
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const confirmDelete = async () => {
+    let validPassword = '0104201234';
+    if (adminMember) {
+      const birthPart = String(adminMember.birth || '').replace(/\D/g, '').slice(0, 6);
+      const phonePart = String(adminMember.phone || '').replace(/\D/g, '').slice(-4);
+      if (birthPart && phonePart) validPassword = `${birthPart}${phonePart}`;
+    }
+    if (password !== validPassword) {
+      setError('관리자 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    setIsDeleting(true);
+    setError('');
+    try {
+      await onConfirm();
+    } catch (deleteError) {
+      setError(`이용권을 삭제하지 못했어요. ${deleteError.message || ''}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="detail-confirm" onClick={onCancel}>
+      <div className="confirm-modal" onClick={(event) => event.stopPropagation()}>
+        <h3>이용권을 삭제할까요?</h3>
+        <p>{pass.name} 회원의 {pass.registeredAt} 이용권과 연결된 레슨 일정도 함께 삭제돼요. 계속하려면 관리자 비밀번호를 입력해 주세요.</p>
+        <input
+          type="password"
+          autoFocus
+          aria-label="관리자 비밀번호"
+          placeholder="생년월일 6자리 + 전화번호 끝 4자리"
+          value={password}
+          onChange={(event) => {
+            setPassword(event.target.value);
+            setError('');
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') confirmDelete();
+          }}
+          disabled={isDeleting}
+          style={{ width: '100%', padding: '8px', margin: '10px 0', border: '1px solid #ccc', borderRadius: '4px' }}
+        />
+        {error && <p className="confirm-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="cancel-button" onClick={onCancel} disabled={isDeleting}>취소</button>
+          <button type="button" className="delete-button" onClick={confirmDelete} disabled={isDeleting}>
+            {isDeleting ? '삭제 중…' : '삭제'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MemberDetail({
   member,
+  adminMember,
   schedules = [],
   passes = [],
   onSave,
@@ -129,10 +189,11 @@ export function MemberDetail({
   });
   const [confirmAction, setConfirmAction] = useState('');
   const [newTotal, setNewTotal] = useState('8');
-  const [newDay, setNewDay] = useState('월요일');
-  const [newHour, setNewHour] = useState('10');
-  const [newMinute, setNewMinute] = useState('00');
+  const [lessonSlots, setLessonSlots] = useState([{ weekday: 1, time: '10:00' }]);
+  const [isPassEditorOpen, setIsPassEditorOpen] = useState(false);
+  const [passError, setPassError] = useState('');
   const [selectedPass, setSelectedPass] = useState(null);
+  const [passToDelete, setPassToDelete] = useState(null);
   const [isAddingPass, setIsAddingPass] = useState(false);
   const [centerAlert, setCenterAlert] = useState('');
 
@@ -169,7 +230,7 @@ export function MemberDetail({
   const submitNewPass = async () => {
     const total = Number(newTotal);
     if (!Number.isInteger(total) || total <= 0) {
-      setCenterAlert('이용권 횟수를 확인해 주세요.');
+      setPassError('이용권 횟수를 확인해 주세요.');
       return;
     }
     const pass = {
@@ -178,23 +239,33 @@ export function MemberDetail({
       total,
       used: 0,
       registeredAt: currentLocalDate(),
-      day: newDay,
-      time: `${newHour}:${newMinute}`,
+      slots: lessonSlots.map((slot) => ({
+        day: `${weekdayOptions.find((day) => day.value === slot.weekday)?.label}요일`,
+        time: slot.time,
+      })),
     };
     setIsAddingPass(true);
+    setPassError('');
     try {
-      const result = await onAddPass?.(pass);
+      await onAddPass?.(pass);
       setNewTotal('8');
-      if (result?.passId) {
-        setSelectedPass({ ...pass, id: result.passId });
-      } else {
-        setCenterAlert('이용권과 레슨 일정을 추가했어요.');
-      }
+      setLessonSlots([{ weekday: 1, time: '10:00' }]);
+      setIsPassEditorOpen(false);
+      setCenterAlert('이용권과 레슨 일정을 추가했어요.');
     } catch (error) {
-      setCenterAlert(`이용권을 추가하지 못했어요. ${error.message || ''}`);
+      setPassError(`이용권을 추가하지 못했어요. ${error.message || ''}`);
     } finally {
       setIsAddingPass(false);
     }
+  };
+
+  const updateLessonSlot = (index, key, value) => {
+    setLessonSlots((current) => current.map((slot, slotIndex) => {
+      if (slotIndex !== index) return slot;
+      if (key === 'weekday') return { ...slot, weekday: Number(value) };
+      const [hour, minute] = slot.time.split(':');
+      return { ...slot, time: key === 'hour' ? `${value}:${minute}` : `${hour}:${value}` };
+    }));
   };
 
   return (
@@ -262,25 +333,14 @@ export function MemberDetail({
                   <i>{pass.registeredAt}</i>
                   <span className="pass-view-label">레슨 일정 보기</span>
                 </button>
-                <button type="button" className="pass-del" onClick={async () => {
-                  try {
-                    await onDeletePass?.(pass);
-                    if (String(selectedPass?.id) === String(pass.id)) setSelectedPass(null);
-                    setCenterAlert('이용권과 연결된 레슨 일정을 삭제했어요.');
-                  } catch (error) {
-                    setCenterAlert(`이용권을 삭제하지 못했어요. ${error.message || ''}`);
-                  }
-                }}>지우기</button>
+                <button type="button" className="pass-del" onClick={() => setPassToDelete(pass)}>삭제</button>
               </div>
             )) : <p className="pass-empty">등록된 이용권이 없어요.</p>}
           </div>
-          <div className="pass-add">
-            <label>총 횟수<input type="number" min="1" step="1" value={newTotal} onChange={(event) => setNewTotal(event.target.value)} /></label>
-            <label>시작 요일<select value={newDay} onChange={(event) => setNewDay(event.target.value)}>{WEEKDAYS.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
-            <label>시간<select value={newHour} onChange={(event) => setNewHour(event.target.value)}>{hourOptions.filter((hour) => Number(hour) >= 6 && Number(hour) <= 22).map((hour) => <option key={hour} value={hour}>{hour}시</option>)}</select></label>
-            <label>분<select value={newMinute} onChange={(event) => setNewMinute(event.target.value)}>{minuteOptions.map((minute) => <option key={minute} value={minute}>{minute}분</option>)}</select></label>
-            <button type="button" className="primary-button" onClick={submitNewPass} disabled={isAddingPass}>{isAddingPass ? '추가 중…' : '＋ 이용권 추가'}</button>
-          </div>
+          <button type="button" className="primary-button pass-add-trigger" onClick={() => {
+            setPassError('');
+            setIsPassEditorOpen(true);
+          }}>＋ 이용권 추가</button>
         </div>
 
         <div className="detail-actions">
@@ -311,6 +371,64 @@ export function MemberDetail({
           />
         )}
       </div>
+      {isPassEditorOpen && (
+        <Backdrop className="pass-add-backdrop" onClose={() => setIsPassEditorOpen(false)}>
+          <section className="detail-modal pass-add-modal" role="dialog" aria-modal="true" aria-labelledby="pass-add-title">
+            <header className="modal-header">
+              <div><span className="eyebrow">PASS</span><h3 id="pass-add-title">{member.name} 회원 이용권 추가</h3></div>
+              <button type="button" className="close-button" onClick={() => setIsPassEditorOpen(false)} aria-label="닫기">×</button>
+            </header>
+            <label className="field">
+              <span>총 횟수</span>
+              <input type="number" min="1" step="1" value={newTotal} onChange={(event) => setNewTotal(event.target.value)} />
+            </label>
+            <div className="pass-add-slots">
+              <div className="pass-add-slots-head">
+                <span>레슨 요일 · 시간</span>
+                {lessonSlots.length < 4 && (
+                  <button type="button" className="member-add-btn" onClick={() => {
+                    setLessonSlots((current) => [...current, { weekday: 1, time: '10:00' }]);
+                  }}>＋ 일정 추가 ({lessonSlots.length}/4)</button>
+                )}
+              </div>
+              {lessonSlots.map((slot, index) => (
+                <div className="pass-add-slot" key={index}>
+                  <select aria-label={`레슨 ${index + 1} 요일`} value={slot.weekday} onChange={(event) => updateLessonSlot(index, 'weekday', event.target.value)}>
+                    {weekdayOptions.map((day) => <option key={day.value} value={day.value}>{day.label}요일</option>)}
+                  </select>
+                  <select aria-label={`레슨 ${index + 1} 시간`} value={slot.time.split(':')[0]} onChange={(event) => updateLessonSlot(index, 'hour', event.target.value)}>
+                    {hourOptions.filter((hour) => Number(hour) >= 6 && Number(hour) <= 22).map((hour) => <option key={hour} value={hour}>{hour}시</option>)}
+                  </select>
+                  <select aria-label={`레슨 ${index + 1} 분`} value={slot.time.split(':')[1]} onChange={(event) => updateLessonSlot(index, 'minute', event.target.value)}>
+                    {minuteOptions.map((minute) => <option key={minute} value={minute}>{minute}분</option>)}
+                  </select>
+                  {lessonSlots.length > 1 && (
+                    <button type="button" className="member-del-btn" onClick={() => setLessonSlots((current) => current.filter((_, slotIndex) => slotIndex !== index))}>삭제</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {passError && <p className="pass-add-error" role="alert">{passError}</p>}
+            <div className="pass-add-actions">
+              <button type="button" className="cancel-button" onClick={() => setIsPassEditorOpen(false)} disabled={isAddingPass}>취소</button>
+              <button type="button" className="primary-button" onClick={submitNewPass} disabled={isAddingPass}>{isAddingPass ? '추가 중…' : '이용권 추가'}</button>
+            </div>
+          </section>
+        </Backdrop>
+      )}
+      {passToDelete && (
+        <PassDeleteConfirm
+          pass={passToDelete}
+          adminMember={adminMember}
+          onCancel={() => setPassToDelete(null)}
+          onConfirm={async () => {
+            await onDeletePass?.(passToDelete);
+            if (String(selectedPass?.id) === String(passToDelete.id)) setSelectedPass(null);
+            setPassToDelete(null);
+            setCenterAlert('이용권과 연결된 레슨 일정을 삭제했어요.');
+          }}
+        />
+      )}
       {selectedPass && <PassScheduleModal pass={selectedPass} schedules={schedules} onClose={() => setSelectedPass(null)} />}
     </Backdrop>
   );

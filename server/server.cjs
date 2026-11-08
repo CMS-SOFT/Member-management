@@ -1088,15 +1088,27 @@ function startServer() {
             if (!pass) return res.status(400).json({ success: false, error: 'pass data is missing' });
             const { member_id, name, total, registeredAt, day, time } = pass;
             const passTotal = Number(total);
-            const startDay = dayMap[day];
-            const validTime = /^([01]\d|2[0-3]):(00|20|40)$/.test(String(time || ''));
+            const slots = Array.isArray(pass.slots) && pass.slots.length ? pass.slots : [{ day, time }];
             const baseDate = registeredAt ? new Date(`${registeredAt}T00:00:00`) : new Date();
             if (!member_id || !name || !Number.isInteger(passTotal) || passTotal <= 0 ||
-                startDay === undefined || !validTime || Number.isNaN(baseDate.getTime())) {
-                return res.status(400).json({ success: false, error: '이용권 횟수, 시작 요일, 시간을 확인해 주세요.' });
+                slots.length > 4 ||
+                slots.some((slot) => dayMap[slot.day] === undefined || !/^([01]\d|2[0-3]):(00|20|40)$/.test(String(slot.time || ''))) ||
+                Number.isNaN(baseDate.getTime())) {
+                return res.status(400).json({ success: false, error: '이용권 횟수와 레슨 요일·시간을 확인해 주세요. 레슨 일정은 최대 4개까지 선택할 수 있어요.' });
             }
 
-            const scheduledDates = Array.from({ length: passTotal }, (_, week) => toYmd(getNextDayOfWeek(baseDate, startDay, week)));
+            const scheduledDates = [];
+            for (let week = 0; scheduledDates.length < passTotal; week += 1) {
+                slots.forEach((slot) => {
+                    if (scheduledDates.length < passTotal) {
+                        scheduledDates.push({
+                            date: toYmd(getNextDayOfWeek(baseDate, dayMap[slot.day], week)),
+                            time: slot.time,
+                        });
+                    }
+                });
+            }
+            scheduledDates.sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
             let passId;
             dbTransaction((database) => {
                 database.run(
@@ -1105,7 +1117,7 @@ function startServer() {
                     [member_id, name, passTotal, passTotal, registeredAt || toYmd(baseDate)]
                 );
                 passId = database.exec('SELECT last_insert_rowid() as id')[0].values[0][0];
-                scheduledDates.forEach((date) => {
+                scheduledDates.forEach(({ date, time }) => {
                     database.run(
                         `INSERT INTO schedules (date,time,member_id,name,status,note,passId,use_flag)
                          VALUES (?,?,?,?,'예약',?,?, 'Y')`,

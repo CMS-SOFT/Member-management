@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Backdrop } from './common';
 import { useDraggable } from '../lib/useDraggable';
-
-const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+import { weekDays } from '../lib/sheet';
 
 function formatWon(value) {
   return `${(Number(value) || 0).toLocaleString('ko-KR')}원`;
@@ -78,7 +77,7 @@ function SettlementEditor({ members, entry, date, onClose, onSave, onDelete }) {
         <p className="settlement-editor-date">{date}</p>
         <label>
           회원
-          <select value={memberId} onChange={(event) => setMemberId(event.target.value)} required>
+          <select className="member-select" value={memberId} onChange={(event) => setMemberId(event.target.value)} required>
             <option value="">회원을 선택해 주세요</option>
             {members.filter((member) => member.role !== '관리자' && member.name !== '관리자').map((member) => (
               <option key={member.id} value={member.id}>{member.name}</option>
@@ -90,6 +89,7 @@ function SettlementEditor({ members, entry, date, onClose, onSave, onDelete }) {
           <div className="settlement-editor-amount">
             <input
               type="text"
+              className="number-input"
               inputMode="numeric"
               value={amount ? Number(amount).toLocaleString('ko-KR') : ''}
               onChange={(event) => setAmount(event.target.value.replace(/\D/g, ''))}
@@ -126,7 +126,7 @@ export function SettlementSection({ members, settlements, selectedMonth, onMoveM
   const entries = memberFilter === 'all'
     ? monthEntries
     : monthEntries.filter((item) => String(item.member_id) === memberFilter);
-  const total = entries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const total = monthEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const people = (members || []).filter((member) => member.role !== '관리자' && member.name !== '관리자');
   const [year, monthNumber] = selectedMonth.split('-').map(Number);
   const firstDay = new Date(year, monthNumber - 1, 1);
@@ -140,50 +140,32 @@ export function SettlementSection({ members, settlements, selectedMonth, onMoveM
   const openNewEntry = (date) => setEditor({ date, entry: null });
   const openEntry = (entry) => setEditor({ date: entry.date, entry });
 
-  const addDate = selectedMonth === toDateString(new Date()).slice(0, 7)
-    ? toDateString(new Date())
-    : `${selectedMonth}-01`;
-
   return (
     <section className="admin-section settlement-section">
-      <div className="settlement-controls-bar">
-        <div className="settlement-left">
-          <select
-            className="settlement-member-select"
-            value={memberFilter}
-            onChange={(event) => setMemberFilter(event.target.value)}
-            aria-label="정산 회원 필터"
-          >
-            <option value="all">전체 회원</option>
-            {people.map((member) => <option key={member.id} value={String(member.id)}>{member.name}</option>)}
-          </select>
+      <div className="schedule-controls">
+        <select
+          className="schedule-member-filter"
+          value={memberFilter}
+          onChange={(event) => setMemberFilter(event.target.value)}
+          aria-label="정산 회원 필터"
+        >
+          <option value="all">전체 회원</option>
+          {people.map((member) => <option key={member.id} value={String(member.id)}>{member.name}</option>)}
+        </select>
+        <div className="month-switcher">
+          <button type="button" aria-label="이전 달" onClick={() => onMoveMonth(-1)}>‹</button>
+          <strong>{year}년 {monthNumber}월</strong>
+          <button type="button" aria-label="다음 달" onClick={() => onMoveMonth(1)}>›</button>
         </div>
-        <div className="settlement-center">
-          <div className="month-switcher">
-            <button type="button" aria-label="이전 달" onClick={() => onMoveMonth(-1)}>‹</button>
-            <strong>{year}년 {monthNumber}월</strong>
-            <button type="button" aria-label="다음 달" onClick={() => onMoveMonth(1)}>›</button>
-          </div>
-          <div className="settlement-total">
-            <span>월 정산 합계</span>
-            <b>{formatWon(total)}</b>
-          </div>
-        </div>
-        <div className="settlement-right">
-          <select className="settlement-view-select" value={view} onChange={(event) => setView(event.target.value)}>
-            <option value="calendar">달력 보기</option>
-            <option value="list">리스트 보기</option>
-          </select>
-        </div>
+        <select className="schedule-view-select" value={view} onChange={(event) => setView(event.target.value)}>
+          <option value="calendar">달력 보기</option>
+          <option value="list">리스트 보기</option>
+        </select>
       </div>
-      <div className="settlement-actions">
-        <button type="button" className="square-button solid" onClick={() => openNewEntry(addDate)}>＋ 정산 추가</button>
-      </div>
-
       {view === 'calendar' ? (
-        <div className="settlement-calendar">
-          <div className="settlement-weekdays">{weekdays.map((day) => <b key={day}>{day}</b>)}</div>
-          <div className="settlement-calendar-grid">
+        <div className="admin-calendar">
+          <div className="calendar-weekdays">{weekDays.map((day) => <b key={day}>{day}</b>)}</div>
+          <div className="calendar-grid">
             {cells.map((date) => {
               const fullDate = toDateString(date);
               const outside = date.getMonth() !== monthNumber - 1;
@@ -192,31 +174,21 @@ export function SettlementSection({ members, settlements, selectedMonth, onMoveM
               const dayCount = dayEntries.length + archivedRows.length;
               const dayTotal = dayEntries.concat(archivedRows).reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0);
               return (
-                <div className={`settlement-calendar-day ${outside ? 'outside' : ''}`} key={fullDate}>
-                  <button type="button" className="settlement-day-number" disabled={outside} onClick={() => openNewEntry(fullDate)}>
-                    {date.getDate()}
-                  </button>
-                  {dayCount > 0 && <div className="settlement-day-summary">{dayCount}건 · {formatWon(dayTotal)}</div>}
-                  {dayEntries.map((entry) => {
-                    const editable = entry.type === '일별정산';
-                    return (
-                      <button
-                        type="button"
-                        className="settlement-calendar-entry"
-                        key={entry.id}
-                        disabled={!editable}
-                        onClick={() => openEntry(entry)}
-                      >
-                        <strong>{entry.name}</strong><span>{formatWon(entry.amount)}</span>
-                      </button>
-                    );
-                  })}
-                  {archivedRows.map((entry) => (
-                    <div className="settlement-calendar-legacy" key={entry.id}>
-                      <strong>{entry.name} · 월 레슨비</strong><span>{formatWon(entry.amount)}</span>
-                    </div>
+                <button
+                  type="button"
+                  className={`admin-calendar-day ${outside ? 'outside' : ''}`}
+                  key={fullDate}
+                  onClick={() => { if (!outside) openNewEntry(fullDate); }}
+                >
+                  <strong>{date.getDate()}</strong>
+                  {dayCount > 0 && <span>{dayCount}건 · {formatWon(dayTotal)}</span>}
+                  {dayEntries.map((entry) => (
+                    <span key={entry.id}>{entry.name} {formatWon(entry.amount)}</span>
                   ))}
-                </div>
+                  {archivedRows.map((entry) => (
+                    <span key={entry.id}>{entry.name} · 월 레슨비 {formatWon(entry.amount)}</span>
+                  ))}
+                </button>
               );
             })}
           </div>
@@ -254,6 +226,10 @@ export function SettlementSection({ members, settlements, selectedMonth, onMoveM
           ) : <p className="empty-lessons">{year}년 {monthNumber}월에 등록된 정산 내역이 없습니다.</p>}
         </div>
       )}
+      <div className="settlement-month-total">
+        <span>합계</span>
+        <b>{formatWon(total)}</b>
+      </div>
 
       {editor && (
         <SettlementEditor

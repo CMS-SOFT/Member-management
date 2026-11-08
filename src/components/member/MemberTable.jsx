@@ -26,12 +26,14 @@ export function MemberTable({ members, memberPassSummary, onOpenMember, onReregi
                 const historyLabel = withdrawn ? '탈퇴' : (summary?.done ? '만료' : (item.history || '이용중'));
                 return (
                   <tr key={item.id || item.name} className={expired ? 'member-row-expired' : ''}>
-                    <td
-                      className="member-name"
-                      onClick={() => onOpenMember(item)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      {item.name}
+                    <td>
+                      <span
+                        className="member-name-link"
+                        onClick={() => onOpenMember(item)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {item.name}
+                      </span>
                     </td>
                     <td>{item.birth}</td>
                     <td>{item.phone}</td>
@@ -48,7 +50,7 @@ export function MemberTable({ members, memberPassSummary, onOpenMember, onReregi
                     <td>
                       {summary && summary.done && !withdrawn ? (
                         <button
-                          className="renotify-button"
+                          className="reregister-trigger-btn"
                           onClick={(event) => {
                             event.stopPropagation();
                             onReregister(item);

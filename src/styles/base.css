@@ -7,8 +7,9 @@ html {
 
 :root {
     --wine: #91002f;
-    --ink: #28242a;
-    --muted: #827b80;
+    --ink: #222222;
+    --muted: #666666;
+    --border-rose: #e0c2c7;
     --line: #e9e3e5;
     --blush: #fff7f8;
     --green: #14805b;
@@ -113,4 +114,20 @@ h3 {
     color: white;
     background: var(--wine);
     font-weight: 800;
+}
+
+.cancel-button {
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+    color: #333333;
+    background: #ffffff;
+    font-weight: 600;
+}
+
+.delete-button {
+    border: 1px solid #ff9999;
+    border-radius: 4px;
+    color: #990000;
+    background: #ffe6e6;
+    font-weight: 600;
 }

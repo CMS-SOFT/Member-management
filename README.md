@@ -29,7 +29,7 @@ npm run lint    # 정적 검사
 
 ## 배포 계획
 - 1단계: PC 크롬에서 기능 검증·안정화 (완료)
-- 2단계: 안드로이드 APK 패키징 — Capacitor 설정 완료. 빌드 절차는 `APK_BUILD.md` 참고.
+- 2단계: 안드로이드 APK 패키징 — Capacitor 설정 완료.
 
 ## APK 빌드 (요약)
 ```bash
@@ -37,11 +37,12 @@ npm run build
 npx cap sync android
 npx cap open android   # Android Studio에서 Build → Build APK
 ```
-자세한 절차·요구 사항은 `APK_BUILD.md`를 보세요. (JDK 17/21 + Android SDK 필요)
+자세한 절차·요구 사항은 `개발가이드(시스템).md`를 보세요. (JDK 17/21 + Android SDK 필요)
 
 ## 문서
-- `POWER.md` — 프로젝트/기능 명세서
-- `사용자가이드.md` — 최종 사용자용 설명서
+- `개발가이드(화면).md` — 화면 구조, UI 규칙, 모달 동작
+- `개발가이드(시스템).md` — DB 구조, 트랜잭션, 아카이브 정책
+- `SKILL_OF_PROOF.md` — 데이터 흐름 증명
 
 ## 기술 스택
 - React 19, Vite, IndexedDB(로컬 저장), ESLint
