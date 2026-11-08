@@ -19,28 +19,18 @@ const COLUMN_LABELS = {
 };
 
 export function ArchiveViewer({ onClose }) {
-  const [years, setYears] = useState([]);
-  const [selectedYear, setSelectedYear] = useState('');
+  const currentYear = new Date().getFullYear();
+  const archiveBaseYear = currentYear - 2;
+  // 선택 가능 연도: 현재 활성 2개년 직전부터 과거로 5개년
+  const defaultYears = Array.from({ length: 5 }, (_, i) => String(archiveBaseYear - 1 - i));
+
+  const [years] = useState(defaultYears);
+  const [selectedYear, setSelectedYear] = useState(defaultYears[0]);
   const [tables, setTables] = useState([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { dragHandleProps, style } = useDraggable();
   const requestId = useRef(0);
-
-  useEffect(() => {
-    let isCurrent = true;
-    requestServer('/archives')
-      .then(({ years: availableYears }) => {
-        if (!isCurrent) return;
-        const yearOptions = availableYears.map(String);
-        setYears(yearOptions);
-        if (yearOptions.length) setSelectedYear(yearOptions[0]);
-      })
-      .catch((caught) => {
-        if (isCurrent) setError(caught.message || '아카이브 연도를 불러오지 못했어요.');
-      });
-    return () => { isCurrent = false; };
-  }, []);
 
   useEffect(() => {
     if (!selectedYear || !years.includes(selectedYear)) return undefined;

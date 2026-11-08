@@ -272,7 +272,7 @@ export function MemberDetail({
     <Backdrop onClose={onClose}>
       <div
         ref={modalBoxRef}
-        className="detail-modal"
+        className="modal-card member-detail-modal"
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
@@ -291,7 +291,7 @@ export function MemberDetail({
           <div><h3>회원 상세 정보</h3></div>
         </div>
 
-        <div className="detail-form">
+        <div className="member-info-form">
           <label className="field"><span>회원명</span><input name="name" value={form.name} onChange={changeField} /></label>
           <label className="field"><span>생년월일</span><input name="birth" value={form.birth} onChange={changeField} /></label>
           <label className="field">
@@ -324,7 +324,7 @@ export function MemberDetail({
 
         <div className="pass-section">
           <div className="pass-section-head"><span className="eyebrow">이용권</span></div>
-          <div className="pass-list pass-list--cards">
+          <div className="passes-container">
             {passes.length ? passes.map((pass) => (
               <div className={`pass-row pass-card ${pass.status === '완료' ? 'done' : ''}`} key={pass.id}>
                 <button type="button" className="pass-card-view" onClick={() => setSelectedPass(pass)}>

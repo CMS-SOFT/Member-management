@@ -69,7 +69,8 @@
     background: white;
 }
 
-.detail-modal {
+.detail-modal,
+.modal-card {
     width: min(500px, 100%);
     max-height: calc(100vh - 40px);
     padding: 25px;
@@ -82,6 +83,11 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
+}
+
+/* 회원 상세 모달 (가이드 §5.3: 너비 600px) */
+.modal-card.member-detail-modal {
+    width: min(600px, 100%);
 }
 
 .modal-header {
@@ -105,7 +111,8 @@
     line-height: 1;
 }
 
-.detail-form {
+.detail-form,
+.member-info-form {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 4px 14px;
@@ -139,7 +146,9 @@
 }
 
 .detail-form .field input,
-.detail-form .field select {
+.member-info-form .field input,
+.detail-form .field select,
+.member-info-form .field select {
     box-sizing: border-box;
     width: 100%;
     height: 40px;
@@ -151,7 +160,8 @@
     font-size: 12px;
 }
 
-.detail-form .field select {
+.detail-form .field select,
+.member-info-form .field select {
     appearance: auto;
 }
 

@@ -50,7 +50,8 @@
     gap: 6px;
 }
 
-.pass-list--cards {
+.pass-list--cards,
+.passes-container {
     max-height: 300px;
     overflow-y: auto;
     overflow-x: auto;
@@ -351,7 +352,8 @@
     opacity: .6;
 }
 
-.detail-modal .detail-actions button {
+.detail-modal .detail-actions button,
+.modal-card.member-detail-modal .detail-actions button {
     flex: 0 0 auto;
     min-width: 58px;
     white-space: nowrap;
