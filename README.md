@@ -39,6 +39,8 @@ npx cap open android   # Android Studio에서 Build → Build APK
 ```
 자세한 절차·요구 사항은 `개발가이드(시스템).md`를 보세요. (JDK 17/21 + Android SDK 필요)
 
+에뮬레이터에서 PC 서버와 연결해 APK를 검증하는 방법은 [APK_테스트_가이드.md](./APK_테스트_가이드.md)를 참고하세요.
+
 ## 문서
 - `개발가이드(화면).md` — 화면 구조, UI 규칙, 모달 동작
 - `개발가이드(시스템).md` — DB 구조, 트랜잭션, 아카이브 정책
