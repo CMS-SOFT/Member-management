@@ -28,9 +28,9 @@ export async function clearAllData() {
     return requestBootstrap();
 }
 
-export async function saveMemberPasses({ memberId, originalName, name, passes }) {
-    return requestServer('/passes/save', {
+export async function saveMemberDetail({ memberId, originalName, member, passes, deletedPassIds }) {
+    return requestServer('/members/detail/save', {
         method: 'POST',
-        body: JSON.stringify({ memberId, originalName, name, passes }),
+        body: JSON.stringify({ memberId, originalName, member, passes, deletedPassIds }),
     });
 }

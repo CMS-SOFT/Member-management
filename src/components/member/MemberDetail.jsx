@@ -88,6 +88,7 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
   const modalBoxRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
   // 💡 lessons 에러 수정: 전달받은 schedules 배열 안전하게 필터링
@@ -112,10 +113,12 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
 
     const handleMouseUp = () => {
       isDraggingRef.current = false;
+      setIsDragging(false);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
 
+    setIsDragging(true);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
@@ -126,7 +129,9 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
   });
   const [confirmAction, setConfirmAction] = useState('');
   const [newTotal, setNewTotal] = useState('8');
+  const [newPassError, setNewPassError] = useState('');
   const [draftPasses, setDraftPasses] = useState(() => (passes || []).map((pass) => ({ ...pass })));
+  const [deletedPassIds, setDeletedPassIds] = useState([]);
 
   const changeField = (event) => {
     const { name, value } = event.target;
@@ -138,7 +143,11 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
 
   const submitNewPass = () => {
     const total = Number(newTotal);
-    if (!total || total <= 0) return;
+    if (!Number.isInteger(total) || total <= 0) {
+      setNewPassError('추가 횟수는 1회 이상 입력해 주세요.');
+      return;
+    }
+    setNewPassError('');
     setDraftPasses((current) => [
       ...current,
       {
@@ -160,7 +169,7 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
         className="detail-modal"
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
-          transition: isDraggingRef.current ? 'none' : 'transform 0.1s ease-out'
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out'
         }}
       >
         <div
@@ -216,7 +225,14 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
                   className="pass-del"
                   title="이용권 삭제"
                   aria-label="이용권 삭제"
-                  onClick={() => setDraftPasses((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                  onClick={() => {
+                    if (pass.id != null) {
+                      setDeletedPassIds((current) => current.includes(Number(pass.id))
+                        ? current
+                        : [...current, Number(pass.id)]);
+                    }
+                    setDraftPasses((current) => current.filter((_, itemIndex) => itemIndex !== index));
+                  }}
                 >
                   ×
                 </button>
@@ -224,9 +240,10 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
             )) : <p className="pass-empty">등록된 이용권이 없어요.</p>}
           </div>
           <div className="pass-add">
-            <label>추가 횟수<input type="number" min="1" value={newTotal} onChange={(event) => setNewTotal(event.target.value)} /></label>
+            <label>추가 횟수<input type="number" min="1" step="1" value={newTotal} onChange={(event) => setNewTotal(event.target.value)} /></label>
             <button className="primary-button" onClick={submitNewPass}>＋ 이용권 추가</button>
           </div>
+          {newPassError && <p className="confirm-error">{newPassError}</p>}
         </div>
 
         <div className="detail-actions">
@@ -237,7 +254,7 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
           </div>
         </div>
 
-        {confirmAction && <DetailConfirm action={confirmAction} member={member} onConfirm={() => confirmAction === 'save' ? onSave(form, draftPasses) : onDelete()} onCancel={() => setConfirmAction('')} />}
+        {confirmAction && <DetailConfirm action={confirmAction} member={member} onConfirm={() => confirmAction === 'save' ? onSave(form, draftPasses, deletedPassIds) : onDelete()} onCancel={() => setConfirmAction('')} />}
       </div>
     </Backdrop>
   );
