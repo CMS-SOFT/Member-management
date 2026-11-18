@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { requestBootstrap } from '../lib/bootstrapService';
+import { useState } from 'react';
+import { requestBootstrap, saveMemberPasses } from '../lib/bootstrapService';
 
 const isSameSchedule = (a, b) =>
   (a.id != null && String(a.id) === String(b.id)) ||
@@ -91,8 +91,15 @@ export function useAdminData({ initialMembers, schedules, onSchedulesChange, pas
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const updateMember = async (updatedMember) => {
+  const updateMember = async (updatedMember, draftPasses = passList.filter((pass) => pass.name === selectedMember.name)) => {
     await apiRequest({ action: 'updateMember', originalName: selectedMember.name, member: updatedMember });
+    const passResult = await saveMemberPasses({
+      memberId: selectedMember.id,
+      originalName: selectedMember.name,
+      name: updatedMember.name,
+      passes: draftPasses,
+    });
+    if (passResult.passes) onPassesChange(passResult.passes);
     setMembers((currentMembers) => currentMembers.map((item) => item.name === selectedMember.name ? updatedMember : item));
     setSelectedMember(null);
   };

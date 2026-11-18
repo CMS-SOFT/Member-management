@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Backdrop } from '../common';
 
 function formatPhoneNumber(value) {
@@ -20,8 +20,9 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [doneMessage, setDoneMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleActionClick = () => {
+  const handleActionClick = async () => {
     if (isAdmin) {
       const birthPart = String(member.birth || '').replace(/\D/g, '').slice(0, 6);
       const phonePart = String(member.phone || '').replace(/\D/g, '').slice(-4);
@@ -32,7 +33,16 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
         return;
       }
     }
-    setDoneMessage(isSave ? '수정되었습니다.' : '삭제되었습니다.');
+    setErrorMsg('');
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+      setDoneMessage(isSave ? '수정되었습니다.' : '삭제되었습니다.');
+    } catch (error) {
+      setErrorMsg(error.message || '저장하지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -52,21 +62,21 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ width: '100%', padding: '8px', margin: '10px 0', border: '1px solid #ccc', borderRadius: '4px' }}
                 />
-                {errorMsg && <p style={{ color: 'red', fontSize: '12px', marginBottom: '10px' }}>{errorMsg}</p>}
               </>
             )}
+            {errorMsg && <p style={{ color: 'red', fontSize: '12px', marginBottom: '10px' }}>{errorMsg}</p>}
 
             <div className="modal-actions">
               <button className="cancel-button" onClick={onCancel}>{isAdmin ? '그만두기' : '취소'}</button>
-              <button className={isSave ? 'primary-button' : 'delete-button'} onClick={handleActionClick}>
-                {isSave ? '수정' : '지우기'}
+              <button className={isSave ? 'primary-button' : 'delete-button'} onClick={handleActionClick} disabled={isSubmitting}>
+                {isSubmitting ? '저장 중...' : isSave ? '수정' : '지우기'}
               </button>
             </div>
           </>
         ) : (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             <h3 style={{ marginBottom: '20px' }}>{doneMessage}</h3>
-            <button className="primary-button" onClick={onConfirm}>확인</button>
+            <button className="primary-button" onClick={onCancel}>확인</button>
           </div>
         )}
       </div>
@@ -74,7 +84,7 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
   );
 }
 
-export function MemberDetail({ member, schedules = [], passes = [], onSave, onDelete, onAddPass, onDeletePass, onClose }) {
+export function MemberDetail({ member, schedules = [], passes = [], onSave, onDelete, onClose }) {
   const modalBoxRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
@@ -116,6 +126,7 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
   });
   const [confirmAction, setConfirmAction] = useState('');
   const [newTotal, setNewTotal] = useState('8');
+  const [draftPasses, setDraftPasses] = useState(() => (passes || []).map((pass) => ({ ...pass })));
 
   const changeField = (event) => {
     const { name, value } = event.target;
@@ -128,7 +139,17 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
   const submitNewPass = () => {
     const total = Number(newTotal);
     if (!total || total <= 0) return;
-    onAddPass?.({ name: member.name, total, used: 0, registeredAt: new Date().toISOString().slice(0, 10) });
+    setDraftPasses((current) => [
+      ...current,
+      {
+        name: member.name,
+        total,
+        used: 0,
+        remaining: total,
+        status: '이용중',
+        registeredAt: new Date().toISOString().slice(0, 10),
+      },
+    ]);
     setNewTotal('8');
   };
 
@@ -174,9 +195,37 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
               </div>
             )) : <p className="pass-empty">등록된 레슨 일정이 없어요.</p>}
           </div>
+          <div className="pass-section-head"><span className="eyebrow">이용권</span></div>
+          <div className="pass-list">
+            {draftPasses.length ? draftPasses.map((pass, index) => (
+              <div className="pass-row" key={pass.id ?? `draft-${index}`}>
+                <b>{pass.registeredAt || '이용권'}</b>
+                <label>
+                  전체 횟수
+                  <input
+                    type="number"
+                    min="1"
+                    value={pass.total}
+                    onChange={(event) => setDraftPasses((current) => current.map((item, itemIndex) => (
+                      itemIndex === index ? { ...item, total: event.target.value } : item
+                    )))}
+                  />
+                </label>
+                <span>사용 {Number(pass.used) || 0}회</span>
+                <button
+                  className="pass-del"
+                  title="이용권 삭제"
+                  aria-label="이용권 삭제"
+                  onClick={() => setDraftPasses((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                >
+                  ×
+                </button>
+              </div>
+            )) : <p className="pass-empty">등록된 이용권이 없어요.</p>}
+          </div>
           <div className="pass-add">
             <label>추가 횟수<input type="number" min="1" value={newTotal} onChange={(event) => setNewTotal(event.target.value)} /></label>
-            <button className="primary-button" onClick={submitNewPass}>＋ 레슨 추가</button>
+            <button className="primary-button" onClick={submitNewPass}>＋ 이용권 추가</button>
           </div>
         </div>
 
@@ -188,7 +237,7 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
           </div>
         </div>
 
-        {confirmAction && <DetailConfirm action={confirmAction} member={member} onConfirm={() => confirmAction === 'save' ? onSave(form) : onDelete()} onCancel={() => setConfirmAction('')} />}
+        {confirmAction && <DetailConfirm action={confirmAction} member={member} onConfirm={() => confirmAction === 'save' ? onSave(form, draftPasses) : onDelete()} onCancel={() => setConfirmAction('')} />}
       </div>
     </Backdrop>
   );

@@ -27,3 +27,10 @@ export async function clearAllData() {
     await requestServer('/clear', { method: 'POST' });
     return requestBootstrap();
 }
+
+export async function saveMemberPasses({ memberId, originalName, name, passes }) {
+    return requestServer('/passes/save', {
+        method: 'POST',
+        body: JSON.stringify({ memberId, originalName, name, passes }),
+    });
+}

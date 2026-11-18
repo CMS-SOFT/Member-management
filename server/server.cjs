@@ -368,6 +368,127 @@ app.post('/api/passes/replace', (req, res) => {
     });
 });
 
+app.post('/api/passes/save', (req, res) => {
+    const { memberId, originalName, name, passes } = req.body;
+    const memberName = String(name || '').trim();
+    if (!memberName || !Array.isArray(passes)) {
+        return res.status(400).json({ success: false, error: '이용권 정보를 확인해 주세요.' });
+    }
+
+    const requestedPasses = [];
+    const requestedIds = new Set();
+    for (const pass of passes) {
+        if (!pass || typeof pass !== 'object') {
+            return res.status(400).json({ success: false, error: '이용권 정보를 확인해 주세요.' });
+        }
+        const id = pass.id == null || pass.id === '' ? null : Number(pass.id);
+        const total = Number(pass.total);
+        const used = Number(pass.used || 0);
+        if ((id !== null && (!Number.isInteger(id) || id <= 0)) ||
+            !Number.isInteger(total) || total < 1 ||
+            !Number.isInteger(used) || used < 0 || used > total ||
+            (id !== null && requestedIds.has(id))) {
+            return res.status(400).json({ success: false, error: '이용권 횟수를 확인해 주세요.' });
+        }
+        if (id !== null) requestedIds.add(id);
+        requestedPasses.push({
+            id,
+            total,
+            used,
+            remaining: total - used,
+            registeredAt: String(pass.registeredAt || new Date().toISOString().slice(0, 10)),
+        });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN IMMEDIATE TRANSACTION', (beginError) => {
+            if (beginError) {
+                return res.status(500).json({ success: false, error: beginError.message });
+            }
+
+            const hasMemberId = Number.isInteger(Number(memberId)) && Number(memberId) > 0;
+            const memberQuery = hasMemberId
+                ? 'SELECT id FROM members WHERE id = ?'
+                : 'SELECT id FROM members WHERE name = ?';
+            const memberValue = hasMemberId ? Number(memberId) : (originalName || memberName);
+
+            db.get(memberQuery, [memberValue], (memberError, member) => {
+                if (memberError || !member) {
+                    return db.run('ROLLBACK', () => res.status(memberError ? 500 : 404).json({
+                        success: false,
+                        error: memberError ? memberError.message : '회원을 찾을 수 없어요.',
+                    }));
+                }
+
+                db.all(
+                    'SELECT id FROM passes WHERE member_id = ? OR (member_id IS NULL AND name = ?)',
+                    [member.id, originalName || memberName],
+                    (selectError, currentPasses) => {
+                        if (selectError) {
+                            return db.run('ROLLBACK', () => res.status(500).json({ success: false, error: selectError.message }));
+                        }
+
+                        const currentIds = new Set(currentPasses.map((pass) => Number(pass.id)));
+                        if (requestedPasses.some((pass) => pass.id !== null && !currentIds.has(pass.id))) {
+                            return db.run('ROLLBACK', () => res.status(400).json({
+                                success: false,
+                                error: '다른 회원의 이용권은 수정할 수 없어요.',
+                            }));
+                        }
+
+                        const operations = [];
+                        for (const pass of currentPasses) {
+                            if (!requestedIds.has(Number(pass.id))) {
+                                operations.push({
+                                    sql: 'DELETE FROM passes WHERE id = ?',
+                                    params: [pass.id],
+                                });
+                            }
+                        }
+                        for (const pass of requestedPasses) {
+                            const status = pass.remaining === 0 ? '완료' : '이용중';
+                            if (pass.id === null) {
+                                operations.push({
+                                    sql: `INSERT INTO passes (member_id, name, total, used, remaining, status, registeredAt)
+                                          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                    params: [member.id, memberName, pass.total, pass.used, pass.remaining, status, pass.registeredAt],
+                                });
+                            } else {
+                                operations.push({
+                                    sql: `UPDATE passes
+                                          SET member_id = ?, name = ?, total = ?, used = ?, remaining = ?, status = ?, registeredAt = ?
+                                          WHERE id = ?`,
+                                    params: [member.id, memberName, pass.total, pass.used, pass.remaining, status, pass.registeredAt, pass.id],
+                                });
+                            }
+                        }
+
+                        const runOperation = (index) => {
+                            if (index >= operations.length) {
+                                return db.run('COMMIT', (commitError) => {
+                                    if (commitError) {
+                                        return db.run('ROLLBACK', () => res.status(500).json({ success: false, error: commitError.message }));
+                                    }
+                                    sendFreshData(res);
+                                });
+                            }
+                            const operation = operations[index];
+                            db.run(operation.sql, operation.params, (operationError) => {
+                                if (operationError) {
+                                    return db.run('ROLLBACK', () => res.status(500).json({ success: false, error: operationError.message }));
+                                }
+                                runOperation(index + 1);
+                            });
+                        };
+
+                        runOperation(0);
+                    }
+                );
+            });
+        });
+    });
+});
+
 app.post('/api/schedules/delete-batch', (req, res) => {
     const { ids } = req.body;
     if (!ids || !ids.length) return res.json({ success: true });
