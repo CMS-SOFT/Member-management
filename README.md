@@ -29,15 +29,10 @@ npm run lint    # 정적 검사
 
 ## AI 질문 기능
 - 관리자 화면 오른쪽 아래의 **AI에게 물어보기** 버튼으로 질문할 수 있습니다.
-- AI 답변에는 OpenAI 호환 채팅 API 설정이 필요합니다. API 사용료는 설정한 API 제공자 계정에 청구될 수 있습니다.
-- 서버를 실행하는 PowerShell에서 아래 환경 변수를 설정하세요. API 키는 저장소에 커밋하지 마세요.
-  ```powershell
-  $env:AI_API_KEY = "발급받은 API 키"
-  $env:AI_API_MODEL = "gpt-4o-mini"
-  $env:AI_API_BASE_URL = "https://api.openai.com/v1"
-  node server/server.cjs
-  ```
-- OpenAI 호환 로컬 서버는 `AI_API_BASE_URL`을 해당 서버 주소로 지정할 수 있으며, 회원 정보와 앱 데이터는 질문에 자동으로 전송되지 않습니다.
+- AI 모델은 **Qwen2.5 7B**이며 첫 사용 시 약 **4.3GB**를 내려받습니다. 브라우저에서 호환 GPU와 약 **5.1GB GPU 메모리**가 필요합니다.
+- 최초 다운로드에는 인터넷이 필요하지만, 모델 준비 후 질문은 WebGPU를 이용해 이 기기에서 처리하며 외부 AI API 키나 질문별 API 사용료가 없습니다.
+- 다운로드 모델은 브라우저 저장소에 캐시됩니다. 브라우저 데이터를 지우거나 다른 브라우저/앱에서 처음 실행하면 다시 내려받을 수 있습니다.
+- 현재는 Windows PC의 WebGPU 지원 브라우저/앱에서만 표시됩니다. Android 앱 지원은 별도 작업입니다.
 
 ## 배포 계획
 - 1단계: PC 크롬에서 기능 검증·안정화 (완료)

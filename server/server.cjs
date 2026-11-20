@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 
 const app = express();
-const PORT = Number(process.env.PORT) || 5000;
+const PORT = 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -41,111 +41,6 @@ app.use((req, res, next) => {
     res.once('finish', releaseRequest);
     res.once('close', releaseRequest);
     next();
-});
-
-const aiRequestWindows = new Map();
-app.post('/api/ai/chat', async (req, res) => {
-    const now = Date.now();
-    const clientId = req.ip || req.socket.remoteAddress || 'unknown';
-    const requestWindow = aiRequestWindows.get(clientId);
-    if (!requestWindow || now - requestWindow.startedAt >= 60_000) {
-        aiRequestWindows.set(clientId, { startedAt: now, count: 1 });
-    } else if (requestWindow.count >= 10) {
-        return res.status(429).json({ success: false, error: 'AI 질문은 1분에 10회까지 가능합니다.' });
-    } else {
-        requestWindow.count += 1;
-    }
-
-    const { messages } = req.body || {};
-    if (!Array.isArray(messages) || messages.length === 0 || messages.length > 12) {
-        return res.status(400).json({ success: false, error: '질문 대화 형식이 올바르지 않습니다.' });
-    }
-
-    const normalizedMessages = [];
-    let totalCharacters = 0;
-    for (const message of messages) {
-        if (!message || !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string') {
-            return res.status(400).json({ success: false, error: '질문 대화 형식이 올바르지 않습니다.' });
-        }
-        const content = message.content.trim();
-        if (!content || content.length > 4000) {
-            return res.status(400).json({ success: false, error: '질문은 1~4,000자 사이로 입력해 주세요.' });
-        }
-        totalCharacters += content.length;
-        normalizedMessages.push({ role: message.role, content });
-    }
-    if (totalCharacters > 12000 || normalizedMessages[normalizedMessages.length - 1].role !== 'user') {
-        return res.status(400).json({ success: false, error: '질문 대화 형식이 올바르지 않습니다.' });
-    }
-
-    const apiBaseUrl = process.env.AI_API_BASE_URL || 'https://api.openai.com/v1';
-    const apiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '';
-    const model = process.env.AI_API_MODEL || 'gpt-4o-mini';
-    let apiUrl;
-    try {
-        const baseUrl = new URL(apiBaseUrl);
-        if (!['http:', 'https:'].includes(baseUrl.protocol)) throw new Error('Unsupported protocol');
-        const isLocalEndpoint = ['localhost', '127.0.0.1', '::1'].includes(baseUrl.hostname);
-        if (!apiKey && !isLocalEndpoint) {
-            return res.status(503).json({
-                success: false,
-                error: 'AI API가 설정되지 않았습니다. AI_API_KEY 환경 변수를 설정해 주세요.',
-            });
-        }
-        apiUrl = `${apiBaseUrl.replace(/\/+$/, '')}/chat/completions`;
-    } catch (error) {
-        return res.status(500).json({ success: false, error: 'AI_API_BASE_URL 설정을 확인해 주세요.' });
-    }
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
-    try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers,
-            signal: controller.signal,
-            body: JSON.stringify({
-                model,
-                messages: [
-                    {
-                        role: 'system',
-                        content: '당신은 Court Mate 테니스 코치의 일반 질문을 돕는 AI 비서입니다. 한국어로 친절하고 간결하게 답하세요. 회원 정보나 앱 데이터를 실제로 조회하거나 변경할 수 있다고 주장하지 마세요. 일정 등록, 수정, 삭제가 완료되었다고 말하지 마세요.',
-                    },
-                    ...normalizedMessages,
-                ],
-                max_tokens: 700,
-            }),
-        });
-
-        if (!response.ok) {
-            const errorMessage = response.status === 401 || response.status === 403
-                ? 'AI API 인증에 실패했습니다. API 키를 확인해 주세요.'
-                : response.status === 429
-                    ? 'AI API 사용 한도에 도달했습니다. 잠시 후 다시 시도해 주세요.'
-                    : `AI 서비스에서 오류가 발생했습니다. (HTTP ${response.status})`;
-            console.error(`[AI API Error] HTTP ${response.status}`);
-            return res.status(502).json({ success: false, error: errorMessage });
-        }
-
-        const data = await response.json();
-        const reply = data?.choices?.[0]?.message?.content;
-        if (typeof reply !== 'string' || !reply.trim()) {
-            console.error('[AI API Error] Response did not contain a text reply');
-            return res.status(502).json({ success: false, error: 'AI 서비스에서 답변을 받지 못했습니다.' });
-        }
-        return res.json({ success: true, reply: reply.trim() });
-    } catch (error) {
-        const errorMessage = error.name === 'AbortError'
-            ? 'AI 응답 시간이 초과되었습니다. 다시 시도해 주세요.'
-            : 'AI 서비스에 연결하지 못했습니다. 서버 주소와 네트워크를 확인해 주세요.';
-        console.error('[AI API Error]', error.message);
-        return res.status(502).json({ success: false, error: errorMessage });
-    } finally {
-        clearTimeout(timeout);
-    }
 });
 
 // 요일 문자열을 숫자로 매핑 (일요일: 0 ~ 토요일: 6)[cite: 2]

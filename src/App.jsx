@@ -12,6 +12,7 @@ function App() {
   const [screen, setScreen] = useState('login');
   const [loginError, setLoginError] = useState('');
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent);
 
   const {
     directoryMembers,
@@ -118,7 +119,7 @@ function App() {
         <footer className="app-footer">Tennis attendance desk</footer>
         {isManualOpen && <UserManual onClose={() => setIsManualOpen(false)} />}
       </section>
-      {screen === 'admin' && <AiAssistantDrawer />}
+      {screen === 'admin' && isWindows && <AiAssistantDrawer />}
     </main>
   );
 }
