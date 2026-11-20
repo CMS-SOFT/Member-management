@@ -27,6 +27,18 @@ npm run build   # 프로덕션 빌드
 npm run lint    # 정적 검사
 ```
 
+## AI 질문 기능
+- 관리자 화면 오른쪽 아래의 **AI에게 물어보기** 버튼으로 질문할 수 있습니다.
+- AI 답변에는 OpenAI 호환 채팅 API 설정이 필요합니다. API 사용료는 설정한 API 제공자 계정에 청구될 수 있습니다.
+- 서버를 실행하는 PowerShell에서 아래 환경 변수를 설정하세요. API 키는 저장소에 커밋하지 마세요.
+  ```powershell
+  $env:AI_API_KEY = "발급받은 API 키"
+  $env:AI_API_MODEL = "gpt-4o-mini"
+  $env:AI_API_BASE_URL = "https://api.openai.com/v1"
+  node server/server.cjs
+  ```
+- OpenAI 호환 로컬 서버는 `AI_API_BASE_URL`을 해당 서버 주소로 지정할 수 있으며, 회원 정보와 앱 데이터는 질문에 자동으로 전송되지 않습니다.
+
 ## 배포 계획
 - 1단계: PC 크롬에서 기능 검증·안정화 (완료)
 - 2단계: 안드로이드 APK 패키징 — Capacitor 설정 완료. 빌드 절차는 `APK_BUILD.md` 참고.

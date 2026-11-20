@@ -6,6 +6,7 @@ import { useAppData } from './hooks/useAppData';
 import { Login } from './components/Login';
 import { Admin } from './components/Admin';
 import { UserManual } from './components/UserManual';
+import { AiAssistantDrawer } from './components/ai/AiAssistantDrawer';
 
 function App() {
   const [screen, setScreen] = useState('login');
@@ -117,6 +118,7 @@ function App() {
         <footer className="app-footer">Tennis attendance desk</footer>
         {isManualOpen && <UserManual onClose={() => setIsManualOpen(false)} />}
       </section>
+      {screen === 'admin' && <AiAssistantDrawer />}
     </main>
   );
 }
