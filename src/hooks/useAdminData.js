@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { mergeSheetMembers } from '../lib/sheet';
+import { requestBootstrap, saveMemberDetail } from '../lib/bootstrapService';
 
 const isSameSchedule = (a, b) =>
   (a.id != null && String(a.id) === String(b.id)) ||
@@ -100,8 +100,16 @@ export function useAdminData({
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const updateMember = async (updatedMember) => {
-    await apiRequest({ action: 'updateMember', originalName: selectedMember.name, member: updatedMember });
+  const updateMember = async (updatedMember, draftPasses = passList.filter((pass) => pass.name === selectedMember.name), deletedPassIds = []) => {
+    const result = await saveMemberDetail({
+      memberId: selectedMember.id,
+      originalName: selectedMember.name,
+      member: updatedMember,
+      passes: draftPasses,
+      deletedPassIds,
+    });
+    if (result.passes) onPassesChange(result.passes);
+    if (result.schedules) onSchedulesChange(result.schedules);
     setMembers((currentMembers) => currentMembers.map((item) => item.name === selectedMember.name ? updatedMember : item));
     setSelectedMember(null);
   };

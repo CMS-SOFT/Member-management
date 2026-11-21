@@ -29,5 +29,9 @@ export async function clearAllData() {
     return requestBootstrap();
 }
 
-// callApi 내부에서 action:'clear'로 호출하면 /action 엔드포인트로 가므로
-// 직접 /clear를 쓰는 경우도 server.cjs의 /api/clear 라우트와 일치합니다.
+export async function saveMemberDetail({ memberId, originalName, member, passes, deletedPassIds }) {
+    return requestServer('/members/detail/save', {
+        method: 'POST',
+        body: JSON.stringify({ memberId, originalName, member, passes, deletedPassIds }),
+    });
+}

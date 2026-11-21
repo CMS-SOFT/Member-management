@@ -6,11 +6,13 @@ import { useAppData } from './hooks/useAppData';
 import { Login } from './components/Login';
 import { Admin } from './components/Admin';
 import { UserManual } from './components/UserManual';
+import { AiAssistantDrawer } from './components/ai/AiAssistantDrawer';
 
 function App() {
   const [screen, setScreen] = useState('login');
   const [loginError, setLoginError] = useState('');
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent);
 
   const {
     directoryMembers,
@@ -123,8 +125,9 @@ function App() {
 
         <footer className="app-footer">Tennis attendance desk</footer>
         {isManualOpen && <UserManual onClose={() => setIsManualOpen(false)} />}
-      </div>
-    </div>
+      </section>
+      {screen === 'admin' && isWindows && <AiAssistantDrawer />}
+    </main>
   );
 }
 

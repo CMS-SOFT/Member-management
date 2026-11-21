@@ -3,6 +3,7 @@ const initSqlJs = require('sql.js');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const app = express();
 const PORT = 5000;
@@ -17,397 +18,29 @@ const dbFile = process.env.MEMBER_MANAGEMENT_DB_PATH
 let db = null;
 let SQL = null;
 
-const ARCHIVE_TABLES = [
-    { name: 'members', label: '회원', dateColumn: null },
-    { name: 'member_lessons', label: '고정 레슨', dateColumn: 'date' },
-    { name: 'passes', label: '이용권', dateColumn: 'registeredAt' },
-    { name: 'schedules', label: '레슨 일정', dateColumn: 'date' },
-    { name: 'settlements', label: '정산', dateColumn: 'date' },
-    { name: 'notifications', label: '알림', dateColumn: 'createdAt' },
-];
-const ARCHIVE_RETENTION_YEARS = 5;
+const retentionTables = ['members', 'member_lessons', 'passes', 'schedules', 'settlements', 'notifications'];
+const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+const backupDirectory = path.join(localAppData, 'CourtMate', 'backups');
+let retentionSweepRunning = false;
+let activeRequestCount = 0;
 
-async function initDatabase() {
-    SQL = await initSqlJs();
-    if (fs.existsSync(dbFile)) {
-        const filebuffer = fs.readFileSync(dbFile);
-        db = new SQL.Database(filebuffer);
-        console.log('✅ SQLite DB 파일 로드 성공:', dbFile);
-    } else {
-        db = new SQL.Database();
-        console.log('✅ 새 SQLite DB 메모리 생성 완료');
+app.use((req, res, next) => {
+    if (retentionSweepRunning) {
+        return res.status(503).json({ success: false, error: '데이터 보관 정리 중입니다. 잠시 후 다시 시도해 주세요.' });
     }
-    initTables();
-    saveDb();
-    try {
-        archiveExpiredData();
-    } catch (err) {
-        console.error('❌ 과거 기록 아카이브에 실패했습니다. 원본 DB 자료를 유지하고 다음 실행 때 다시 시도합니다:', err);
-    }
-    startServer();
-}
-
-// DB 변경 사항을 파일로 동기화하는 함수
-function saveDb() {
-    if (!db) return;
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    const temporaryPath = `${dbFile}.${process.pid}.tmp`;
-    try {
-        fs.writeFileSync(temporaryPath, buffer);
-        fs.renameSync(temporaryPath, dbFile);
-    } catch (err) {
-        try {
-            if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
-        } catch (cleanupError) {
-            console.error('❌ 임시 DB 파일 정리에 실패했습니다:', cleanupError);
-        }
-        throw err;
-    }
-}
-
-/**
- * sql.js 전용 헬퍼 함수들 (sqlite3 문법 호환용)
- */
-// 1. SELECT 조회 (db.all 호환)
-function dbAll(query, params = [], callback) {
-    try {
-        const stmt = db.prepare(query);
-        stmt.bind(params);
-        const rows = [];
-        while (stmt.step()) {
-            rows.push(stmt.getAsObject());
-        }
-        stmt.free();
-        callback(null, rows);
-    } catch (err) {
-        callback(err, null);
-    }
-}
-
-// 2. 단건 조회 (db.get 호환)
-function dbGet(query, params = [], callback) {
-    dbAll(query, params, (err, rows) => {
-        if (err) return callback(err, null);
-        callback(null, rows && rows.length > 0 ? rows[0] : null);
-    });
-}
-
-// 3. INSERT / UPDATE / DELETE 실행 (db.run 호환)
-function dbRun(query, params = [], callback) {
-    try {
-        // sql.js는 인자 바인딩 시 배열 또는 객체 지원
-        db.run(query, params);
-
-        // AUTOINCREMENT로 생성된 lastID 구하기
-        let lastID = null;
-        if (/^\s*INSERT\s+/i.test(query)) {
-            const res = db.exec("SELECT last_insert_rowid() as id;");
-            if (res.length > 0 && res[0].values.length > 0) {
-                lastID = res[0].values[0][0];
-            }
-        }
-
-        saveDb(); // 변경 즉시 파일 저장
-
-        if (typeof callback === 'function') {
-            // this.lastID 형태로 접근할 수 있도록 context 부여
-            callback.call({ lastID }, null);
-        }
-    } catch (err) {
-        if (typeof callback === 'function') {
-            callback(err);
-        }
-    }
-}
-
-// 4. 트랜잭션 및 일괄 실행 (db.exec 호환)
-function dbExec(query, callback) {
-    try {
-        db.exec(query);
-        saveDb();
-        if (typeof callback === 'function') callback(null);
-    } catch (err) {
-        if (typeof callback === 'function') callback(err);
-    }
-}
-
-function dbTransaction(work, callback) {
-    try {
-        db.run('BEGIN TRANSACTION');
-        work(db);
-        db.run('COMMIT');
-        saveDb();
-        callback(null);
-    } catch (err) {
-        try { db.run('ROLLBACK'); } catch (rollbackError) { /* Transaction already closed. */ }
-        callback(err);
-    }
-}
-
-function rowsForArchive(query) {
-    const statement = db.prepare(query);
-    const rows = [];
-    try {
-        while (statement.step()) rows.push(statement.getAsObject());
-    } finally {
-        statement.free();
-    }
-    return rows;
-}
-
-function archiveDateYear(value) {
-    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ''));
-    if (!match) return null;
-    const [, yearText, monthText, dayText] = match;
-    const year = Number(yearText);
-    const month = Number(monthText);
-    const day = Number(dayText);
-    const date = new Date(year, month - 1, day);
-    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-    return year;
-}
-
-function csvEscape(value) {
-    const text = value == null ? '' : String(value);
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
-
-function rowsToCsv(columns, rows) {
-    const lines = [columns.map(csvEscape).join(',')];
-    rows.forEach((row) => lines.push(columns.map((column) => csvEscape(row[column])).join(',')));
-    return `\uFEFF${lines.join('\r\n')}\r\n`;
-}
-
-function parseCsvRows(text) {
-    const input = String(text || '').replace(/^\uFEFF/, '');
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let quoted = false;
-    for (let index = 0; index < input.length; index += 1) {
-        const character = input[index];
-        if (quoted) {
-            if (character === '"' && input[index + 1] === '"') {
-                cell += '"';
-                index += 1;
-            } else if (character === '"') {
-                quoted = false;
-            } else {
-                cell += character;
-            }
-        } else if (character === '"' && cell.length === 0) {
-            quoted = true;
-        } else if (character === ',') {
-            row.push(cell);
-            cell = '';
-        } else if (character === '\n' || character === '\r') {
-            if (character === '\r' && input[index + 1] === '\n') index += 1;
-            row.push(cell);
-            if (row.some((value) => value !== '')) rows.push(row);
-            row = [];
-            cell = '';
-        } else {
-            cell += character;
-        }
-    }
-    if (quoted) throw new Error('아카이브 CSV의 따옴표 형식이 올바르지 않습니다.');
-    if (row.length || cell) {
-        row.push(cell);
-        if (row.some((value) => value !== '')) rows.push(row);
-    }
-    return rows;
-}
-
-function csvFileRows(filePath, columns, required = false) {
-    if (!fs.existsSync(filePath)) {
-        if (required) throw new Error(`아카이브 CSV 파일이 없습니다: ${filePath}`);
-        return [];
-    }
-    const parsed = parseCsvRows(fs.readFileSync(filePath, 'utf8'));
-    if (
-        !parsed.length ||
-        parsed[0].join('\0') !== columns.join('\0') ||
-        parsed.slice(1).some((row) => row.length !== columns.length)
-    ) {
-        throw new Error(`아카이브 CSV의 열 구성이 올바르지 않습니다: ${filePath}`);
-    }
-    return parsed.slice(1).map((values) => Object.fromEntries(
-        columns.map((column, index) => [column, values[index] ?? ''])
-    ));
-}
-
-function installArchiveYear(year, tables) {
-    const archiveRoot = path.join(path.dirname(dbFile), 'archives');
-    const stagingPath = path.join(archiveRoot, `.staging-${year}-${process.pid}-${Date.now()}`);
-    const destinationPath = path.join(archiveRoot, String(year));
-    const previousPath = path.join(archiveRoot, `.previous-${year}-${process.pid}-${Date.now()}`);
-    fs.mkdirSync(stagingPath, { recursive: true });
-
-    try {
-        ARCHIVE_TABLES.forEach(({ name }) => {
-            const columns = tables[name].columns;
-            const existingRows = csvFileRows(
-                path.join(destinationPath, `${name}.csv`),
-                columns,
-                fs.existsSync(destinationPath)
-            );
-            const mergedRows = new Map(existingRows.map((row) => [String(row.id), row]));
-            tables[name].rows.forEach((row) => mergedRows.set(String(row.id), row));
-            const rows = [...mergedRows.values()];
-            const csv = rowsToCsv(columns, rows);
-            const filePath = path.join(stagingPath, `${name}.csv`);
-            fs.writeFileSync(filePath, csv, 'utf8');
-            if (fs.readFileSync(filePath, 'utf8') !== csv || parseCsvRows(csv).length !== rows.length + 1) {
-                throw new Error(`아카이브 CSV 검증에 실패했습니다: ${year}/${name}.csv`);
-            }
-        });
-
-        let movedPrevious = false;
-        if (fs.existsSync(destinationPath)) {
-            fs.renameSync(destinationPath, previousPath);
-            movedPrevious = true;
-        }
-        try {
-            fs.renameSync(stagingPath, destinationPath);
-        } catch (err) {
-            if (movedPrevious) fs.renameSync(previousPath, destinationPath);
-            throw err;
-        }
-        if (movedPrevious) {
-            try {
-                fs.rmSync(previousPath, { recursive: true, force: true });
-            } catch (err) {
-                console.error(`❌ 이전 아카이브 임시 폴더를 정리하지 못했습니다: ${previousPath}`, err);
-            }
-        }
-    } finally {
-        if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
-    }
-}
-
-function archiveExpiredData() {
-    const cutoffYear = new Date().getFullYear() - 2;
-    const archiveRoot = path.join(path.dirname(dbFile), 'archives');
-    const tableRows = Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => {
-        const columns = db.exec(`PRAGMA table_info(${name})`)[0]?.values.map((column) => column[1]) || [];
-        return [name, { columns, rows: [] }];
-    }));
-    const rowsByYear = new Map();
-    const deletedIds = Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => [name, new Set()]));
-    const invalidDatedRows = [];
-    const ensureYear = (year) => {
-        if (!rowsByYear.has(year)) {
-            rowsByYear.set(year, Object.fromEntries(ARCHIVE_TABLES.map(({ name }) => [name, []])));
-        }
-        return rowsByYear.get(year);
+    activeRequestCount += 1;
+    let released = false;
+    const releaseRequest = () => {
+        if (released) return;
+        released = true;
+        activeRequestCount -= 1;
     };
-    const addRow = (tableName, row, year) => {
-        ensureYear(year)[tableName].push(row);
-        if (row.id != null) deletedIds[tableName].add(row.id);
-    };
+    res.once('finish', releaseRequest);
+    res.once('close', releaseRequest);
+    next();
+});
 
-    const datedTables = ARCHIVE_TABLES.filter(({ dateColumn }) => dateColumn);
-    const latestActivityYear = new Map();
-    datedTables.forEach(({ name, dateColumn }) => {
-        const rows = rowsForArchive(`SELECT * FROM ${name}`);
-        tableRows[name].rows = rows;
-        rows.forEach((row) => {
-            const year = archiveDateYear(row[dateColumn]);
-            if (row[dateColumn] && year == null) invalidDatedRows.push({ table: name, id: row.id });
-            if (year != null && row.member_id != null) {
-                const memberId = String(row.member_id);
-                latestActivityYear.set(memberId, Math.max(latestActivityYear.get(memberId) || 0, year));
-            }
-            if (year != null && year <= cutoffYear) addRow(name, row, year);
-        });
-    });
-
-    const memberRows = rowsForArchive(`SELECT * FROM members`);
-    tableRows.members.rows = memberRows;
-    const archivedMemberYears = new Map();
-    memberRows.forEach((member) => {
-        const activityYear = latestActivityYear.get(String(member.id));
-        const isAdmin = member.role === '관리자' || member.name === '관리자';
-        if (!isAdmin && activityYear != null && activityYear <= cutoffYear) {
-            archivedMemberYears.set(String(member.id), activityYear);
-            addRow('members', member, activityYear);
-        }
-    });
-
-    ['member_lessons', 'passes'].forEach((name) => {
-        const { dateColumn } = ARCHIVE_TABLES.find((table) => table.name === name);
-        const rows = rowsForArchive(`SELECT * FROM ${name}`);
-        tableRows[name].rows = rows;
-        rows.forEach((row) => {
-            if (archiveDateYear(row[dateColumn]) != null || row.member_id == null) return;
-            const activityYear = archivedMemberYears.get(String(row.member_id));
-            if (activityYear != null) addRow(name, row, activityYear);
-        });
-    });
-
-    const unclassifiedDates = invalidDatedRows.filter(({ table, id }) => !deletedIds[table].has(id));
-    if (unclassifiedDates.length) {
-        const counts = unclassifiedDates.reduce((result, { table }) => {
-            result[table] = (result[table] || 0) + 1;
-            return result;
-        }, {});
-        console.warn('⚠️ 날짜 형식이 올바르지 않은 기록은 아카이브하지 않고 DB에 유지합니다:', counts);
-    }
-
-    const archiveYears = [...rowsByYear.keys()].sort((left, right) => left - right);
-    if (!archiveYears.length) return;
-    fs.mkdirSync(archiveRoot, { recursive: true });
-    archiveYears.forEach((year) => installArchiveYear(year, Object.fromEntries(
-        ARCHIVE_TABLES.map(({ name }) => [name, { columns: tableRows[name].columns, rows: rowsByYear.get(year)[name] }])
-    )));
-
-    const snapshot = db.export();
-    try {
-        db.run('BEGIN TRANSACTION');
-        ARCHIVE_TABLES.forEach(({ name }) => {
-            const ids = [...deletedIds[name]];
-            for (let offset = 0; offset < ids.length; offset += 500) {
-                const batch = ids.slice(offset, offset + 500);
-                db.run(`DELETE FROM ${name} WHERE id IN (${batch.map(() => '?').join(',')})`, batch);
-            }
-        });
-        db.run('COMMIT');
-        saveDb();
-    } catch (err) {
-        try { db.run('ROLLBACK'); } catch (rollbackError) { /* Transaction may already be committed. */ }
-        db.close();
-        db = new SQL.Database(snapshot);
-        throw err;
-    }
-    console.log(`✅ 과거 기록 아카이브 완료: ${archiveYears.join(', ')}년 자료`);
-}
-// 5. prepare / stmt 호환 객체
-function dbPrepare(query) {
-    return {
-        run(params = [], callback) {
-            dbRun(query, params, callback);
-        },
-        finalize(callback) {
-            if (typeof callback === 'function') callback(null);
-        }
-    };
-}
-
-// 컬럼 추가 유틸
-function addColumnIfMissing(table, column, definition) {
-    dbAll(`PRAGMA table_info(${table})`, [], (err, rows) => {
-        if (err) return;
-        const exists = rows.some(r => r.name === column);
-        if (!exists) {
-            dbRun(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`, [], (err) => {
-                if (err) console.error(`❌ ${table}.${column} 컬럼 추가 실패:`, err.message);
-            });
-        }
-    });
-}
-
-// 요일 문자열을 숫자로 매핑 (일요일: 0 ~ 토요일: 6)
+// 요일 문자열을 숫자로 매핑 (일요일: 0 ~ 토요일: 6)[cite: 2]
 const dayMap = {
     '일요일': 0, '월요일': 1, '화요일': 2, '수요일': 3,
     '목요일': 4, '금요일': 5, '토요일': 6
@@ -480,95 +113,248 @@ function checkLessonAvailability(date, time, newLessonType, newMemberName, callb
     });
 }
 
-// ── 테이블 초기화 (use_flag 컬럼 포함) ──────────────────────────────
-function initTables() {
-    dbRun(`CREATE TABLE IF NOT EXISTS members (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        name        TEXT    NOT NULL,
-        birth       TEXT,
-        phone       TEXT,
-        gender      TEXT,
-        level       TEXT,
-        lessonType  TEXT    DEFAULT '개인',
-        role        TEXT    DEFAULT '사용자',
-        status      TEXT    DEFAULT '등록',
-        use_flag    CHAR(1) DEFAULT 'Y'
+// 테이블 초기화[cite: 2]
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        birth TEXT,
+        phone TEXT,
+        gender TEXT,
+        level TEXT,
+        lessonType TEXT DEFAULT '개인',
+        role TEXT DEFAULT '사용자',
+        status TEXT DEFAULT '등록',
+        retentionAt TEXT
     )`);
     addColumnIfMissing('members', 'use_flag', "CHAR(1) DEFAULT 'Y'");
 
-    dbRun(`CREATE TABLE IF NOT EXISTS member_lessons (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        member_id   INTEGER,
-        name        TEXT    NOT NULL,
-        date        TEXT,
-        day         TEXT    NOT NULL,
-        time        TEXT    NOT NULL,
-        use_flag    CHAR(1) DEFAULT 'Y'
+    db.run(`CREATE TABLE IF NOT EXISTS member_lessons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        member_id INTEGER,
+        name TEXT NOT NULL,
+        day TEXT NOT NULL,
+        time TEXT NOT NULL,
+        retentionAt TEXT
     )`);
     addColumnIfMissing('member_lessons', 'use_flag', "CHAR(1) DEFAULT 'Y'");
     addColumnIfMissing('member_lessons', 'date', 'TEXT');
 
-    dbRun(`CREATE TABLE IF NOT EXISTS passes (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        member_id    INTEGER,
-        name         TEXT    NOT NULL,
-        total        INTEGER DEFAULT 0,
-        used         INTEGER DEFAULT 0,
-        remaining    INTEGER DEFAULT 0,
-        status       TEXT    DEFAULT '이용중',
+    db.run(`CREATE TABLE IF NOT EXISTS passes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        member_id INTEGER,
+        name TEXT NOT NULL,
+        total INTEGER DEFAULT 0,
+        used INTEGER DEFAULT 0,
+        remaining INTEGER DEFAULT 0,
+        status TEXT DEFAULT '이용중',
         registeredAt TEXT,
-        use_flag     CHAR(1) DEFAULT 'Y'
+        retentionAt TEXT
     )`);
     addColumnIfMissing('passes', 'use_flag', "CHAR(1) DEFAULT 'Y'");
 
-    dbRun(`CREATE TABLE IF NOT EXISTS schedules (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        date        TEXT    NOT NULL,
-        time        TEXT    NOT NULL,
-        member_id   INTEGER,
-        name        TEXT    NOT NULL,
-        status      TEXT    DEFAULT '예약',
-        note        TEXT,
-        passId      TEXT,
-        use_flag    CHAR(1) DEFAULT 'Y'
+    db.run(`CREATE TABLE IF NOT EXISTS schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        time TEXT NOT NULL,
+        member_id INTEGER,
+        name TEXT NOT NULL,
+        status TEXT DEFAULT '예약',
+        note TEXT,
+        passId TEXT,
+        retentionAt TEXT
     )`);
     addColumnIfMissing('schedules', 'use_flag', "CHAR(1) DEFAULT 'Y'");
 
-    dbRun(`CREATE TABLE IF NOT EXISTS settlements (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        member_id   INTEGER,
-        name        TEXT    NOT NULL,
-        amount      INTEGER DEFAULT 0,
-        type        TEXT,
-        date        TEXT    NOT NULL,
-        note        TEXT,
-        use_flag    CHAR(1) DEFAULT 'Y'
+    db.run(`CREATE TABLE IF NOT EXISTS settlements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        member_id INTEGER,
+        name TEXT NOT NULL,
+        amount INTEGER DEFAULT 0,
+        type TEXT,
+        date TEXT NOT NULL,
+        note TEXT,
+        retentionAt TEXT
     )`);
     addColumnIfMissing('settlements', 'use_flag', "CHAR(1) DEFAULT 'Y'");
     dbRun(`CREATE INDEX IF NOT EXISTS idx_settlements_active_date
         ON settlements(use_flag, date, member_id)`);
 
-    dbRun(`CREATE TABLE IF NOT EXISTS notifications (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        title       TEXT    NOT NULL,
-        message     TEXT    NOT NULL,
-        type        TEXT,
-        isRead      INTEGER DEFAULT 0,
-        createdAt   TEXT,
-        use_flag    CHAR(1) DEFAULT 'Y'
+    db.run(`CREATE TABLE IF NOT EXISTS notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        message TEXT NOT NULL,
+        type TEXT,
+        isRead INTEGER DEFAULT 0,
+        createdAt TEXT,
+        retentionAt TEXT
     )`);
     addColumnIfMissing('notifications', 'use_flag', "CHAR(1) DEFAULT 'Y'");
 
-    // 마이그레이션
-    dbRun(`UPDATE members        SET use_flag = 'Y' WHERE use_flag IS NULL`);
-    dbRun(`UPDATE member_lessons SET use_flag = 'Y' WHERE use_flag IS NULL`);
-    dbRun(`UPDATE passes         SET use_flag = 'Y' WHERE use_flag IS NULL`);
-    dbRun(`UPDATE schedules      SET use_flag = 'Y' WHERE use_flag IS NULL`);
-    dbRun(`UPDATE settlements    SET use_flag = 'Y' WHERE use_flag IS NULL`);
-    dbRun(`UPDATE notifications  SET use_flag = 'Y' WHERE use_flag IS NULL`);
-}
+const ensureRetentionSchema = (callback) => {
+    const ensureTableColumn = (tableIndex) => {
+        if (tableIndex >= retentionTables.length) return stampLegacyRows(0);
+        const table = retentionTables[tableIndex];
+        db.all(`PRAGMA table_info(${table})`, [], (error, columns) => {
+            if (error) return callback(error);
+            if (columns.some((column) => column.name === 'retentionAt')) {
+                return ensureTableColumn(tableIndex + 1);
+            }
+            db.run(`ALTER TABLE ${table} ADD COLUMN retentionAt TEXT`, (alterError) => {
+                if (alterError) return callback(alterError);
+                ensureTableColumn(tableIndex + 1);
+            });
+        });
+    };
 
-// ── 공통 데이터 조회 ────────────────────────────────────────────────
+    const stampLegacyRows = (tableIndex) => {
+        if (tableIndex >= retentionTables.length) return createRetentionTriggers(0);
+        const table = retentionTables[tableIndex];
+        db.run(
+            `UPDATE ${table} SET retentionAt = ? WHERE retentionAt IS NULL OR TRIM(retentionAt) = ''`,
+            [new Date().toISOString()],
+            (error) => {
+                if (error) return callback(error);
+                stampLegacyRows(tableIndex + 1);
+            }
+        );
+    };
+
+    const createRetentionTriggers = (tableIndex) => {
+        if (tableIndex >= retentionTables.length) return callback(null);
+        const table = retentionTables[tableIndex];
+        db.run(
+            `CREATE TRIGGER IF NOT EXISTS ${table}_retention_timestamp
+             AFTER INSERT ON ${table}
+             WHEN NEW.retentionAt IS NULL OR TRIM(NEW.retentionAt) = ''
+             BEGIN
+                 UPDATE ${table}
+                 SET retentionAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                 WHERE id = NEW.id;
+             END`,
+            (error) => {
+                if (error) return callback(error);
+                db.run(`CREATE INDEX IF NOT EXISTS idx_${table}_retention_at ON ${table}(retentionAt)`, (indexError) => {
+                    if (indexError) return callback(indexError);
+                    createRetentionTriggers(tableIndex + 1);
+                });
+            }
+        );
+    };
+
+    ensureTableColumn(0);
+};
+
+const createDailyBackup = async () => {
+    await fs.promises.mkdir(backupDirectory, { recursive: true });
+    const date = new Date().toISOString().slice(0, 10);
+    const destination = path.join(backupDirectory, `member_management-${date}.db`);
+    try {
+        const existing = await fs.promises.stat(destination);
+        if (existing.isFile() && existing.size > 0) return;
+        await fs.promises.unlink(destination);
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
+
+    const temporary = `${destination}.${process.pid}.tmp`;
+    try {
+        await fs.promises.unlink(temporary);
+    } catch (error) {
+        if (error.code !== 'ENOENT') throw error;
+    }
+    await new Promise((resolve, reject) => {
+        const backup = db.backup(temporary);
+        backup.step(-1, (stepError) => {
+            if (stepError) {
+                return backup.finish(() => reject(stepError));
+            }
+            backup.finish((finishError) => {
+                if (finishError) return reject(finishError);
+                resolve();
+            });
+        });
+    });
+    const completed = await fs.promises.stat(temporary);
+    if (!completed.isFile() || completed.size === 0) {
+        throw new Error('백업 파일이 비어 있어 보관 정리를 중단했습니다.');
+    }
+    await fs.promises.rename(temporary, destination);
+};
+
+const purgeExpiredRows = (cutoff) => new Promise((resolve, reject) => {
+    const cutoffLiteral = `'${cutoff.toISOString()}'`;
+    const memberHasRecentChildren = [
+        ['member_lessons', 'member_id'],
+        ['passes', 'member_id'],
+        ['schedules', 'member_id'],
+        ['settlements', 'member_id'],
+    ].map(([table, memberColumn]) => (
+        `NOT EXISTS (
+            SELECT 1 FROM ${table} child
+            WHERE child.${memberColumn} = members.id
+               OR (child.${memberColumn} IS NULL AND child.name = members.name)
+        )`
+    )).join(' AND ');
+
+    db.exec(
+        `BEGIN IMMEDIATE;
+         DELETE FROM notifications WHERE retentionAt < ${cutoffLiteral};
+         DELETE FROM schedules WHERE retentionAt < ${cutoffLiteral};
+         DELETE FROM member_lessons WHERE retentionAt < ${cutoffLiteral};
+         DELETE FROM settlements WHERE retentionAt < ${cutoffLiteral};
+         DELETE FROM passes
+          WHERE retentionAt < ${cutoffLiteral}
+            AND NOT EXISTS (
+                SELECT 1 FROM schedules
+                WHERE schedules.passId = CAST(passes.id AS TEXT)
+                  AND schedules.retentionAt >= ${cutoffLiteral}
+            );
+         DELETE FROM members
+          WHERE COALESCE(role, '') != '관리자'
+            AND retentionAt < ${cutoffLiteral}
+            AND ${memberHasRecentChildren};
+         COMMIT;`,
+        (error) => {
+            if (!error) return resolve();
+            db.exec('ROLLBACK;', () => reject(error));
+        }
+    );
+});
+
+const purgeExpiredBackups = async (cutoff) => {
+    const entries = await fs.promises.readdir(backupDirectory, { withFileTypes: true });
+    for (const entry of entries) {
+        if (!entry.isFile() || !/^member_management-\d{4}-\d{2}-\d{2}\.db$/.test(entry.name)) continue;
+        const filePath = path.join(backupDirectory, entry.name);
+        const stats = await fs.promises.stat(filePath);
+        if (stats.mtime < cutoff) await fs.promises.unlink(filePath);
+    }
+};
+
+const runRetentionSweep = async () => {
+    if (retentionSweepRunning) return;
+    if (activeRequestCount > 0) {
+        const retry = setTimeout(runRetentionSweep, 60 * 1000);
+        retry.unref();
+        return;
+    }
+    retentionSweepRunning = true;
+    try {
+        await createDailyBackup();
+        const cutoff = new Date();
+        cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 2);
+        await purgeExpiredRows(cutoff);
+        await purgeExpiredBackups(cutoff);
+        console.log(`✅ 2년 보관 정리 완료 (기준: ${cutoff.toISOString()})`);
+    } catch (error) {
+        console.error('❌ 2년 보관 정리 실패. 데이터 삭제는 백업 성공 후에만 수행됩니다:', error.message);
+    } finally {
+        retentionSweepRunning = false;
+    }
+};
+
+// 공통 데이터 조회[cite: 2]
 const sendFreshData = (res, extraData = {}) => {
     dbAll(`SELECT * FROM members WHERE use_flag = 'Y'`, [], (err, members) => {
         dbAll(`SELECT * FROM member_lessons WHERE use_flag = 'Y'`, [], (err, member_lessons) => {
@@ -1576,29 +1362,185 @@ function startServer() {
         });
     });
 
-    app.post('/api/schedules/delete-batch', (req, res) => {
-        const { ids } = req.body;
-        if (!ids || !ids.length) return res.json({ success: true });
-        dbRun(
-            `UPDATE schedules SET use_flag='N' WHERE id IN (${ids.map(() => '?').join(',')})`,
-            ids,
-            () => res.json({ success: true })
-        );
-    });
+app.post('/api/members/detail/save', (req, res) => {
+    const { memberId, originalName, member: memberData, passes, deletedPassIds = [] } = req.body;
+    const memberName = String(memberData?.name || '').trim();
+    if (!memberData || typeof memberData !== 'object' || Array.isArray(memberData) || !memberName || !Array.isArray(passes) || !Array.isArray(deletedPassIds)) {
+        return res.status(400).json({ success: false, error: '이용권 정보를 확인해 주세요.' });
+    }
 
-    app.post('/api/clear', (req, res) => {
-        clearAllUserData((err) => {
-            if (err) return res.status(500).json({ success: false, error: err.message });
-            sendFreshData(res);
+    const requestedPasses = [];
+    const requestedIds = new Set();
+    const requestedDeletedIds = new Set();
+    for (const value of deletedPassIds) {
+        const id = Number(value);
+        if (!Number.isInteger(id) || id <= 0 || requestedDeletedIds.has(id)) {
+            return res.status(400).json({ success: false, error: '삭제할 이용권 정보를 확인해 주세요.' });
+        }
+        requestedDeletedIds.add(id);
+    }
+
+    for (const pass of passes) {
+        if (!pass || typeof pass !== 'object') {
+            return res.status(400).json({ success: false, error: '이용권 정보를 확인해 주세요.' });
+        }
+        const id = pass.id == null || pass.id === '' ? null : Number(pass.id);
+        const total = Number(pass.total);
+        const used = Number(pass.used || 0);
+        if ((id !== null && (!Number.isInteger(id) || id <= 0)) ||
+            !Number.isInteger(total) || total < 1 ||
+            !Number.isInteger(used) || used < 0 || used > total ||
+            (id !== null && (requestedIds.has(id) || requestedDeletedIds.has(id)))) {
+            return res.status(400).json({ success: false, error: '이용권 횟수를 확인해 주세요.' });
+        }
+        if (id !== null) requestedIds.add(id);
+        requestedPasses.push({
+            id,
+            total,
+            used,
+            remaining: total - used,
+            status: String(pass.status || ''),
+            registeredAt: String(pass.registeredAt || new Date().toISOString().slice(0, 10)),
+        });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN IMMEDIATE TRANSACTION', (beginError) => {
+            if (beginError) {
+                return res.status(500).json({ success: false, error: beginError.message });
+            }
+
+            const hasMemberId = Number.isInteger(Number(memberId)) && Number(memberId) > 0;
+            const memberQuery = hasMemberId
+                ? 'SELECT id FROM members WHERE id = ?'
+                : 'SELECT id FROM members WHERE name = ?';
+            const memberValue = hasMemberId ? Number(memberId) : (originalName || memberName);
+
+            db.get(memberQuery, [memberValue], (memberError, memberRow) => {
+                if (memberError || !memberRow) {
+                    return db.run('ROLLBACK', () => res.status(memberError ? 500 : 404).json({
+                        success: false,
+                        error: memberError ? memberError.message : '회원을 찾을 수 없어요.',
+                    }));
+                }
+
+                db.all(
+                    'SELECT id FROM passes WHERE member_id = ? OR (member_id IS NULL AND name = ?)',
+                    [memberRow.id, originalName || memberName],
+                    (selectError, currentPasses) => {
+                        if (selectError) {
+                            return db.run('ROLLBACK', () => res.status(500).json({ success: false, error: selectError.message }));
+                        }
+
+                        const currentIds = new Set(currentPasses.map((pass) => Number(pass.id)));
+                        if (requestedPasses.some((pass) => pass.id !== null && !currentIds.has(pass.id))) {
+                            return db.run('ROLLBACK', () => res.status(400).json({
+                                success: false,
+                                error: '다른 회원의 이용권은 수정할 수 없어요.',
+                            }));
+                        }
+                        if ([...requestedDeletedIds].some((id) => !currentIds.has(id))) {
+                            return db.run('ROLLBACK', () => res.status(400).json({
+                                success: false,
+                                error: '다른 회원의 이용권은 삭제할 수 없어요.',
+                            }));
+                        }
+
+                        const operations = [{
+                            sql: `UPDATE members
+                                  SET name = ?, birth = ?, phone = ?, gender = ?, level = ?, lessonType = ?, status = ?
+                                  WHERE id = ?`,
+                            params: [
+                                memberName,
+                                String(memberData.birth || ''),
+                                String(memberData.phone || ''),
+                                String(memberData.gender || ''),
+                                String(memberData.level || ''),
+                                String(memberData.lessonType || '개인'),
+                                String(memberData.status || '등록'),
+                                memberRow.id,
+                            ],
+                        }];
+                        operations.push(
+                            {
+                                sql: 'UPDATE schedules SET name = ? WHERE member_id = ?',
+                                params: [memberName, memberRow.id],
+                            },
+                            {
+                                sql: 'UPDATE member_lessons SET name = ? WHERE member_id = ?',
+                                params: [memberName, memberRow.id],
+                            }
+                        );
+                        for (const id of requestedDeletedIds) {
+                            operations.push({
+                                sql: 'DELETE FROM passes WHERE id = ?',
+                                params: [id],
+                            });
+                        }
+                        for (const pass of requestedPasses) {
+                            const status = pass.remaining === 0 ? '완료' : pass.status === '만료' ? '만료' : '이용중';
+                            if (pass.id === null) {
+                                operations.push({
+                                    sql: `INSERT INTO passes (member_id, name, total, used, remaining, status, registeredAt)
+                                          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                                    params: [memberRow.id, memberName, pass.total, pass.used, pass.remaining, status, pass.registeredAt],
+                                });
+                            } else {
+                                operations.push({
+                                    sql: `UPDATE passes
+                                          SET member_id = ?, name = ?, total = ?, used = ?, remaining = ?, status = ?, registeredAt = ?
+                                          WHERE id = ?`,
+                                    params: [memberRow.id, memberName, pass.total, pass.used, pass.remaining, status, pass.registeredAt, pass.id],
+                                });
+                            }
+                        }
+
+                        const runOperation = (index) => {
+                            if (index >= operations.length) {
+                                return db.run('COMMIT', (commitError) => {
+                                    if (commitError) {
+                                        return db.run('ROLLBACK', () => res.status(500).json({ success: false, error: commitError.message }));
+                                    }
+                                    sendFreshData(res);
+                                });
+                            }
+                            const operation = operations[index];
+                            db.run(operation.sql, operation.params, (operationError) => {
+                                if (operationError) {
+                                    return db.run('ROLLBACK', () => res.status(500).json({ success: false, error: operationError.message }));
+                                }
+                                runOperation(index + 1);
+                            });
+                        };
+
+                        runOperation(0);
+                    }
+                );
+            });
         });
     });
+});
 
-    app.listen(PORT, () => {
-        console.log(`백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+app.post('/api/schedules/delete-batch', (req, res) => {
+    const { ids } = req.body;
+    if (!ids || !ids.length) return res.json({ success: true });
+    db.run(`DELETE FROM schedules WHERE id IN (${ids.map(() => '?').join(',')})`, ids, () => {
+        res.json({ success: true });
     });
-}
 
-// 초기화 실행 후 서버 시작
-initDatabase().catch(err => {
-    console.error('❌ DB 초기화 중 에러 발생:', err);
+ensureRetentionSchema((error) => {
+    if (error) {
+        console.error('❌ 데이터 보관 스키마 준비 실패:', error.message);
+        db.close((closeError) => {
+            if (closeError) console.error('❌ 데이터베이스 종료 실패:', closeError.message);
+            process.exitCode = 1;
+        });
+        return;
+    }
+    runRetentionSweep().finally(() => {
+        app.listen(PORT, () => {
+            console.log(`백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+            setInterval(runRetentionSweep, 24 * 60 * 60 * 1000).unref();
+        });
+    });
 });

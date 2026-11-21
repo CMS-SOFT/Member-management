@@ -1,6 +1,4 @@
 import { useState, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { hourOptions, minuteOptions, weekdayOptions } from '../../lib/sheet';
 import { Backdrop } from '../common';
 
 function currentLocalDate() {
@@ -51,8 +49,9 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [doneMessage, setDoneMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleActionClick = () => {
+  const handleActionClick = async () => {
     if (isAdmin) {
       const birthPart = String(member.birth || '').replace(/\D/g, '').slice(0, 6);
       const phonePart = String(member.phone || '').replace(/\D/g, '').slice(-4);
@@ -62,7 +61,16 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
         return;
       }
     }
-    setDoneMessage(isSave ? '수정되었습니다.' : '삭제되었습니다.');
+    setErrorMsg('');
+    setIsSubmitting(true);
+    try {
+      await onConfirm();
+      setDoneMessage(isSave ? '수정되었습니다.' : '삭제되었습니다.');
+    } catch (error) {
+      setErrorMsg(error.message || '저장하지 못했어요. 다시 시도해 주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -81,20 +89,21 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
                   onChange={(e) => setPassword(e.target.value)}
                   style={{ width: '100%', padding: '8px', margin: '10px 0', border: '1px solid #ccc', borderRadius: '4px' }}
                 />
-                {errorMsg && <p style={{ color: 'red', fontSize: '12px', marginBottom: '10px' }}>{errorMsg}</p>}
               </>
             )}
+            {errorMsg && <p style={{ color: 'red', fontSize: '12px', marginBottom: '10px' }}>{errorMsg}</p>}
+
             <div className="modal-actions">
               <button className="cancel-button" onClick={onCancel}>{isAdmin ? '그만두기' : '취소'}</button>
-              <button className={isSave ? 'primary-button' : 'delete-button'} onClick={handleActionClick}>
-                {isSave ? '수정' : '지우기'}
+              <button className={isSave ? 'primary-button' : 'delete-button'} onClick={handleActionClick} disabled={isSubmitting}>
+                {isSubmitting ? '저장 중...' : isSave ? '수정' : '지우기'}
               </button>
             </div>
           </>
         ) : (
           <div style={{ textAlign: 'center', padding: '10px 0' }}>
             <h3 style={{ marginBottom: '20px' }}>{doneMessage}</h3>
-            <button className="primary-button" onClick={onConfirm}>확인</button>
+            <button className="primary-button" onClick={onCancel}>확인</button>
           </div>
         )}
       </div>
@@ -102,82 +111,12 @@ function DetailConfirm({ action, member, onConfirm, onCancel }) {
   );
 }
 
-function PassDeleteConfirm({ pass, adminMember, onConfirm, onCancel }) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const confirmDelete = async () => {
-    let validPassword = '0104201234';
-    if (adminMember) {
-      const birthPart = String(adminMember.birth || '').replace(/\D/g, '').slice(0, 6);
-      const phonePart = String(adminMember.phone || '').replace(/\D/g, '').slice(-4);
-      if (birthPart && phonePart) validPassword = `${birthPart}${phonePart}`;
-    }
-    if (password !== validPassword) {
-      setError('관리자 비밀번호가 일치하지 않습니다.');
-      return;
-    }
-
-    setIsDeleting(true);
-    setError('');
-    try {
-      await onConfirm();
-    } catch (deleteError) {
-      setError(`이용권을 삭제하지 못했어요. ${deleteError.message || ''}`);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  return (
-    <div className="detail-confirm" onClick={onCancel}>
-      <div className="confirm-modal" onClick={(event) => event.stopPropagation()}>
-        <h3>이용권을 삭제할까요?</h3>
-        <p>{pass.name} 회원의 {pass.registeredAt} 이용권과 연결된 레슨 일정도 함께 삭제돼요. 계속하려면 관리자 비밀번호를 입력해 주세요.</p>
-        <input
-          type="password"
-          autoFocus
-          aria-label="관리자 비밀번호"
-          placeholder="생년월일 6자리 + 전화번호 끝 4자리"
-          value={password}
-          onChange={(event) => {
-            setPassword(event.target.value);
-            setError('');
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') confirmDelete();
-          }}
-          disabled={isDeleting}
-          style={{ width: '100%', padding: '8px', margin: '10px 0', border: '1px solid #ccc', borderRadius: '4px' }}
-        />
-        {error && <p className="confirm-error" role="alert">{error}</p>}
-        <div className="modal-actions">
-          <button type="button" className="cancel-button" onClick={onCancel} disabled={isDeleting}>취소</button>
-          <button type="button" className="delete-button" onClick={confirmDelete} disabled={isDeleting}>
-            {isDeleting ? '삭제 중…' : '삭제'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function MemberDetail({
-  member,
-  adminMember,
-  schedules = [],
-  passes = [],
-  onSave,
-  onDelete,
-  onAddPass,
-  onDeletePass,
-  onClose,
-}) {
+export function MemberDetail({ member, schedules = [], passes = [], onSave, onDelete, onClose }) {
   const modalBoxRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
   const historyValue = member.status === '탈퇴' ? '탈퇴' : (member.history === '탈퇴' ? '탈퇴' : '이용중');
@@ -215,9 +154,21 @@ export function MemberDetail({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
+
+    setIsDragging(true);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
+
+  const [form, setForm] = useState({
+    ...member,
+    phone: formatPhoneNumber(member.phone)
+  });
+  const [confirmAction, setConfirmAction] = useState('');
+  const [newTotal, setNewTotal] = useState('8');
+  const [newPassError, setNewPassError] = useState('');
+  const [draftPasses, setDraftPasses] = useState(() => (passes || []).map((pass) => ({ ...pass })));
+  const [deletedPassIds, setDeletedPassIds] = useState([]);
 
   const changeField = (event) => {
     const { name, value } = event.target;
@@ -230,42 +181,22 @@ export function MemberDetail({
   const submitNewPass = async () => {
     const total = Number(newTotal);
     if (!Number.isInteger(total) || total <= 0) {
-      setPassError('이용권 횟수를 확인해 주세요.');
+      setNewPassError('추가 횟수는 1회 이상 입력해 주세요.');
       return;
     }
-    const pass = {
-      member_id: member.id,
-      name: member.name,
-      total,
-      used: 0,
-      registeredAt: currentLocalDate(),
-      slots: lessonSlots.map((slot) => ({
-        day: `${weekdayOptions.find((day) => day.value === slot.weekday)?.label}요일`,
-        time: slot.time,
-      })),
-    };
-    setIsAddingPass(true);
-    setPassError('');
-    try {
-      await onAddPass?.(pass);
-      setNewTotal('8');
-      setLessonSlots([{ weekday: 1, time: '10:00' }]);
-      setIsPassEditorOpen(false);
-      setCenterAlert('이용권과 레슨 일정을 추가했어요.');
-    } catch (error) {
-      setPassError(`이용권을 추가하지 못했어요. ${error.message || ''}`);
-    } finally {
-      setIsAddingPass(false);
-    }
-  };
-
-  const updateLessonSlot = (index, key, value) => {
-    setLessonSlots((current) => current.map((slot, slotIndex) => {
-      if (slotIndex !== index) return slot;
-      if (key === 'weekday') return { ...slot, weekday: Number(value) };
-      const [hour, minute] = slot.time.split(':');
-      return { ...slot, time: key === 'hour' ? `${value}:${minute}` : `${hour}:${value}` };
-    }));
+    setNewPassError('');
+    setDraftPasses((current) => [
+      ...current,
+      {
+        name: member.name,
+        total,
+        used: 0,
+        remaining: total,
+        status: '이용중',
+        registeredAt: new Date().toISOString().slice(0, 10),
+      },
+    ]);
+    setNewTotal('8');
   };
 
   return (
@@ -275,7 +206,7 @@ export function MemberDetail({
         className="modal-card member-detail-modal"
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
-          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out'
         }}
       >
         {centerAlert && (
@@ -335,12 +266,48 @@ export function MemberDetail({
                 </button>
                 <button type="button" className="pass-del" onClick={() => setPassToDelete(pass)}>삭제</button>
               </div>
+            )) : <p className="pass-empty">등록된 레슨 일정이 없어요.</p>}
+          </div>
+          <div className="pass-section-head"><span className="eyebrow">이용권</span></div>
+          <div className="pass-list">
+            {draftPasses.length ? draftPasses.map((pass, index) => (
+              <div className="pass-row" key={pass.id ?? `draft-${index}`}>
+                <b>{pass.registeredAt || '이용권'}</b>
+                <label>
+                  전체 횟수
+                  <input
+                    type="number"
+                    min="1"
+                    value={pass.total}
+                    onChange={(event) => setDraftPasses((current) => current.map((item, itemIndex) => (
+                      itemIndex === index ? { ...item, total: event.target.value } : item
+                    )))}
+                  />
+                </label>
+                <span>사용 {Number(pass.used) || 0}회</span>
+                <button
+                  className="pass-del"
+                  title="이용권 삭제"
+                  aria-label="이용권 삭제"
+                  onClick={() => {
+                    if (pass.id != null) {
+                      setDeletedPassIds((current) => current.includes(Number(pass.id))
+                        ? current
+                        : [...current, Number(pass.id)]);
+                    }
+                    setDraftPasses((current) => current.filter((_, itemIndex) => itemIndex !== index));
+                  }}
+                >
+                  ×
+                </button>
+              </div>
             )) : <p className="pass-empty">등록된 이용권이 없어요.</p>}
           </div>
-          <button type="button" className="primary-button pass-add-trigger" onClick={() => {
-            setPassError('');
-            setIsPassEditorOpen(true);
-          }}>＋ 이용권 추가</button>
+          <div className="pass-add">
+            <label>추가 횟수<input type="number" min="1" step="1" value={newTotal} onChange={(event) => setNewTotal(event.target.value)} /></label>
+            <button className="primary-button" onClick={submitNewPass}>＋ 이용권 추가</button>
+          </div>
+          {newPassError && <p className="confirm-error">{newPassError}</p>}
         </div>
 
         <div className="detail-actions">
@@ -356,20 +323,7 @@ export function MemberDetail({
           </div>
         </div>
 
-        {confirmAction && (
-          <DetailConfirm
-            action={confirmAction}
-            member={member}
-            onConfirm={() => {
-              if (confirmAction === 'save') {
-                onSave(form);
-              } else {
-                onDelete();
-              }
-            }}
-            onCancel={() => setConfirmAction('')}
-          />
-        )}
+        {confirmAction && <DetailConfirm action={confirmAction} member={member} onConfirm={() => confirmAction === 'save' ? onSave(form, draftPasses, deletedPassIds) : onDelete()} onCancel={() => setConfirmAction('')} />}
       </div>
       {isPassEditorOpen && (
         <Backdrop className="pass-add-backdrop" onClose={() => setIsPassEditorOpen(false)}>
