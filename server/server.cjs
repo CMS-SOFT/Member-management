@@ -17,6 +17,238 @@ const dbFile = process.env.MEMBER_MANAGEMENT_DB_PATH
     : path.resolve(__dirname, 'member_management.db');
 let db = null;
 let SQL = null;
+let rawDb = null;
+let transactionDepth = 0;
+
+const ARCHIVE_TABLES = [
+    { name: 'members', label: '회원' },
+    { name: 'member_lessons', label: '고정 레슨' },
+    { name: 'passes', label: '이용권' },
+    { name: 'schedules', label: '레슨 일정' },
+    { name: 'settlements', label: '정산' },
+    { name: 'notifications', label: '알림' },
+];
+const ARCHIVE_RETENTION_YEARS = 5;
+
+function saveDb() {
+    if (!rawDb) return;
+    const temporaryPath = `${dbFile}.${process.pid}.tmp`;
+    fs.mkdirSync(path.dirname(dbFile), { recursive: true });
+    try {
+        fs.writeFileSync(temporaryPath, Buffer.from(rawDb.export()));
+        fs.renameSync(temporaryPath, dbFile);
+    } catch (error) {
+        try {
+            if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+        } catch (cleanupError) {
+            console.error('임시 DB 파일 정리에 실패했습니다:', cleanupError);
+        }
+        throw error;
+    }
+}
+
+function createDatabaseAdapter(database) {
+    const readRows = (query, params = []) => {
+        const statement = database.prepare(query);
+        const rows = [];
+        try {
+            statement.bind(params);
+            while (statement.step()) rows.push(statement.getAsObject());
+        } finally {
+            statement.free();
+        }
+        return rows;
+    };
+
+    const run = (query, params, callback) => {
+        if (typeof params === 'function') {
+            callback = params;
+            params = [];
+        }
+        const sql = String(query).trim();
+        let lastID = null;
+        try {
+            database.run(query, params || []);
+            if (/^\s*INSERT\b/i.test(sql)) {
+                lastID = readRows('SELECT last_insert_rowid() AS id')[0]?.id ?? null;
+            }
+
+            if (/^(BEGIN)\b/i.test(sql)) {
+                transactionDepth += 1;
+            } else if (/^(COMMIT|END)\b/i.test(sql)) {
+                transactionDepth = Math.max(0, transactionDepth - 1);
+            } else if (/^ROLLBACK\b/i.test(sql)) {
+                transactionDepth = 0;
+            }
+            if (transactionDepth === 0 && !/^(BEGIN|ROLLBACK)\b/i.test(sql)) saveDb();
+        } catch (error) {
+            if (typeof callback === 'function') return callback(error);
+            throw error;
+        }
+        if (typeof callback === 'function') callback.call({ lastID }, null);
+    };
+
+    return {
+        serialize(callback) {
+            callback();
+        },
+        run,
+        all(query, params, callback) {
+            if (typeof params === 'function') {
+                callback = params;
+                params = [];
+            }
+            let rows;
+            try {
+                rows = readRows(query, params || []);
+            } catch (error) {
+                return callback(error, null);
+            }
+            callback(null, rows);
+        },
+        get(query, params, callback) {
+            if (typeof params === 'function') {
+                callback = params;
+                params = [];
+            }
+            this.all(query, params || [], (error, rows) => callback(error, rows && rows[0]));
+        },
+        exec(query, callback) {
+            if (typeof callback !== 'function') return database.exec(query);
+            try {
+                database.exec(query);
+                const sql = String(query).trim();
+                if (/\bROLLBACK\b/i.test(sql)) transactionDepth = 0;
+                else if (/\b(COMMIT|END)\b/i.test(sql)) transactionDepth = 0;
+                else if (/\bBEGIN\b/i.test(sql)) transactionDepth += 1;
+                if (transactionDepth === 0) saveDb();
+            } catch (error) {
+                return callback(error);
+            }
+            callback(null);
+        },
+        export() {
+            return database.export();
+        },
+        close(callback) {
+            database.close();
+            rawDb = null;
+            if (typeof callback === 'function') callback(null);
+        },
+    };
+}
+
+function dbAll(query, params = [], callback) {
+    db.all(query, params, callback);
+}
+
+function dbGet(query, params = [], callback) {
+    db.get(query, params, callback);
+}
+
+function dbRun(query, params = [], callback) {
+    db.run(query, params, callback);
+}
+
+function dbExec(query, callback) {
+    db.exec(query, callback);
+}
+
+function dbTransaction(work, callback) {
+    let transactionError = null;
+    try {
+        db.run('BEGIN TRANSACTION');
+        work(db);
+        db.run('COMMIT');
+    } catch (error) {
+        transactionError = error;
+        try {
+            db.run('ROLLBACK');
+        } catch (rollbackError) {
+            console.error('트랜잭션 롤백 실패:', rollbackError.message);
+        }
+    }
+    callback(transactionError);
+}
+
+function dbPrepare(query) {
+    return {
+        run(params = [], callback) {
+            dbRun(query, params, callback);
+        },
+        finalize(callback) {
+            if (typeof callback === 'function') callback(null);
+        },
+    };
+}
+
+function addColumnIfMissing(table, column, definition) {
+    dbAll(`PRAGMA table_info(${table})`, [], (error, columns) => {
+        if (error) throw error;
+        if (columns.some((entry) => entry.name === column)) return;
+        dbRun(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`, [], (alterError) => {
+            if (alterError) throw alterError;
+        });
+    });
+}
+
+function parseCsvRows(text) {
+    const input = String(text || '').replace(/^\uFEFF/, '');
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    for (let index = 0; index < input.length; index += 1) {
+        const character = input[index];
+        if (quoted) {
+            if (character === '"' && input[index + 1] === '"') {
+                cell += '"';
+                index += 1;
+            } else if (character === '"') {
+                quoted = false;
+            } else {
+                cell += character;
+            }
+        } else if (character === '"' && cell.length === 0) {
+            quoted = true;
+        } else if (character === ',') {
+            row.push(cell);
+            cell = '';
+        } else if (character === '\n' || character === '\r') {
+            if (character === '\r' && input[index + 1] === '\n') index += 1;
+            row.push(cell);
+            if (row.some((value) => value !== '')) rows.push(row);
+            row = [];
+            cell = '';
+        } else {
+            cell += character;
+        }
+    }
+    if (quoted) throw new Error('아카이브 CSV의 따옴표 형식이 올바르지 않습니다.');
+    if (row.length || cell) {
+        row.push(cell);
+        if (row.some((value) => value !== '')) rows.push(row);
+    }
+    return rows;
+}
+
+function csvFileRows(filePath, columns, required = false) {
+    if (!fs.existsSync(filePath)) {
+        if (required) throw new Error(`아카이브 CSV 파일이 없습니다: ${filePath}`);
+        return [];
+    }
+    const parsed = parseCsvRows(fs.readFileSync(filePath, 'utf8'));
+    if (
+        !parsed.length ||
+        parsed[0].join('\0') !== columns.join('\0') ||
+        parsed.slice(1).some((row) => row.length !== columns.length)
+    ) {
+        throw new Error(`아카이브 CSV의 열 구성이 올바르지 않습니다: ${filePath}`);
+    }
+    return parsed.slice(1).map((values) => Object.fromEntries(
+        columns.map((column, index) => [column, values[index] ?? ''])
+    ));
+}
 
 const retentionTables = ['members', 'member_lessons', 'passes', 'schedules', 'settlements', 'notifications'];
 const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
@@ -114,7 +346,8 @@ function checkLessonAvailability(date, time, newLessonType, newMemberName, callb
 }
 
 // 테이블 초기화[cite: 2]
-db.serialize(() => {
+function initTables() {
+    db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -190,6 +423,8 @@ db.serialize(() => {
         retentionAt TEXT
     )`);
     addColumnIfMissing('notifications', 'use_flag', "CHAR(1) DEFAULT 'Y'");
+    });
+}
 
 const ensureRetentionSchema = (callback) => {
     const ensureTableColumn = (tableIndex) => {
@@ -263,18 +498,7 @@ const createDailyBackup = async () => {
     } catch (error) {
         if (error.code !== 'ENOENT') throw error;
     }
-    await new Promise((resolve, reject) => {
-        const backup = db.backup(temporary);
-        backup.step(-1, (stepError) => {
-            if (stepError) {
-                return backup.finish(() => reject(stepError));
-            }
-            backup.finish((finishError) => {
-                if (finishError) return reject(finishError);
-                resolve();
-            });
-        });
-    });
+    await fs.promises.writeFile(temporary, Buffer.from(db.export()));
     const completed = await fs.promises.stat(temporary);
     if (!completed.isFile() || completed.size === 0) {
         throw new Error('백업 파일이 비어 있어 보관 정리를 중단했습니다.');
@@ -1527,20 +1751,48 @@ app.post('/api/schedules/delete-batch', (req, res) => {
     db.run(`DELETE FROM schedules WHERE id IN (${ids.map(() => '?').join(',')})`, ids, () => {
         res.json({ success: true });
     });
+});
+}
 
-ensureRetentionSchema((error) => {
-    if (error) {
-        console.error('❌ 데이터 보관 스키마 준비 실패:', error.message);
-        db.close((closeError) => {
-            if (closeError) console.error('❌ 데이터베이스 종료 실패:', closeError.message);
-            process.exitCode = 1;
-        });
-        return;
+async function initDatabase() {
+    SQL = await initSqlJs();
+    if (fs.existsSync(dbFile)) {
+        rawDb = new SQL.Database(fs.readFileSync(dbFile));
+        console.log('✅ SQLite DB 파일 로드 성공:', dbFile);
+    } else {
+        rawDb = new SQL.Database();
+        console.log('✅ 새 SQLite DB 메모리 생성 완료');
     }
-    runRetentionSweep().finally(() => {
-        app.listen(PORT, () => {
-            console.log(`백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
-            setInterval(runRetentionSweep, 24 * 60 * 60 * 1000).unref();
+    db = createDatabaseAdapter(rawDb);
+    initTables();
+
+    await new Promise((resolve, reject) => {
+        ensureRetentionSchema((error) => {
+            if (error) return reject(error);
+            resolve();
         });
     });
+    await runRetentionSweep();
+    startServer();
+
+    await new Promise((resolve, reject) => {
+        const server = app.listen(PORT, () => {
+            console.log(`백엔드 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+            setInterval(runRetentionSweep, 24 * 60 * 60 * 1000).unref();
+            resolve();
+        });
+        server.once('error', reject);
+    });
+}
+
+initDatabase().catch((error) => {
+    console.error('❌ DB 초기화 중 오류가 발생했습니다:', error);
+    if (db) {
+        db.close((closeError) => {
+            if (closeError) console.error('❌ DB 종료 실패:', closeError.message);
+            process.exitCode = 1;
+        });
+    } else {
+        process.exitCode = 1;
+    }
 });
