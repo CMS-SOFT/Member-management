@@ -6,10 +6,10 @@ import { useAppData } from './hooks/useAppData';
 import { Login } from './components/Login';
 import { Admin } from './components/Admin';
 import { UserManual } from './components/UserManual';
-import { AiAssistantDrawer } from './components/ai/AiAssistantDrawer';
 
 function App() {
   const [screen, setScreen] = useState('login');
+  const [adminTab, setAdminTab] = useState('schedule');
   const [loginError, setLoginError] = useState('');
   const [isManualOpen, setIsManualOpen] = useState(false);
   const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent);
@@ -110,6 +110,8 @@ function App() {
             />
           ) : (
             <Admin
+              activeTab={adminTab}
+              onActiveTabChange={setAdminTab}
               initialMembers={adminMembers}
               schedules={adminSchedules}
               onSchedulesChange={setAdminSchedules}
@@ -119,15 +121,16 @@ function App() {
               onSettlementsChange={setAdminSettlements}
               apiRequest={callApi}
               sheetLoadError={loadError}
+              isWindows={isWindows}
+              onOpenManual={() => setIsManualOpen(true)}
             />
           )}
         </main>
 
         <footer className="app-footer">Tennis attendance desk</footer>
         {isManualOpen && <UserManual onClose={() => setIsManualOpen(false)} />}
-      </section>
-      {screen === 'admin' && isWindows && <AiAssistantDrawer />}
-    </main>
+      </div>
+    </div>
   );
 }
 

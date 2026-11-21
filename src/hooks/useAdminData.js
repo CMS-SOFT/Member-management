@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { requestBootstrap, saveMemberDetail } from '../lib/bootstrapService';
+import { saveMemberDetail } from '../lib/bootstrapService';
+import { mergeSheetMembers } from '../lib/sheet';
 
 const isSameSchedule = (a, b) =>
   (a.id != null && String(a.id) === String(b.id)) ||
@@ -311,7 +312,7 @@ export function useAdminData({
     reregisterMember, setReregisterMember,
     isClearConfirm, setIsClearConfirm,
     isClearDoneModal, setIsClearDoneModal,
-    selectedMonth,
+    selectedMonth, setSelectedMonth,
     filteredLessons, monthLessons, stats,
     passSummaryOf, memberPassSummary, canSchedule,
     updateMember, deleteMember, registerMember,

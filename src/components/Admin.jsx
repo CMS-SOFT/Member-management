@@ -9,6 +9,8 @@ import { ScheduleSection } from './schedule/ScheduleSection';
 import { LessonListModal } from './schedule/LessonListModal';
 import { LessonEditor } from './schedule/LessonEditor';
 import { SettlementSection } from './SettlementSection';
+import { AiAssistantDrawer } from './ai/AiAssistantDrawer';
+import { normalizeSchedules } from '../lib/sheet';
 import {
   passesToCsv, membersToCsv, schedulesToCsv,
   downloadCsv, parsePassesCsv, parseMembersCsv, parseSchedulesCsv,
@@ -99,12 +101,18 @@ function AdminClearConfirmModal({ members = [], onConfirm, onCancel }) {
 }
 
 // 통합된 자료 관리 드롭다운 컴포넌트
-function IntegratedCsvTools({ passes, members, schedules, onImported, onError, onArchiveView, onClearData, apiRequest }) {
+function IntegratedCsvTools({ passes, members, schedules, onImported, onError, onArchiveView, onClearData, apiRequest, assistantOpenRequest }) {
   const [isOpen, setIsOpen] = useState(false);
   const [importingType, setImportingType] = useState(null);
+  const [previousAssistantOpenRequest, setPreviousAssistantOpenRequest] = useState(assistantOpenRequest);
   const menuRef = useRef(null);
   const fileInputRef = useRef(null);
   const importTypeRef = useRef(null);
+
+  if (assistantOpenRequest !== previousAssistantOpenRequest) {
+    setPreviousAssistantOpenRequest(assistantOpenRequest);
+    if (assistantOpenRequest) setIsOpen(true);
+  }
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -287,7 +295,7 @@ function IntegratedCsvTools({ passes, members, schedules, onImported, onError, o
           borderRadius: '6px',
           boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
           padding: '16px',
-          zIndex: 1000,
+          zIndex: assistantOpenRequest ? 1400 : 1000,
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
@@ -340,6 +348,8 @@ function IntegratedCsvTools({ passes, members, schedules, onImported, onError, o
 
 // 관리자 대시보드 메인 컴포넌트
 export function Admin({
+  activeTab = 'schedule',
+  onActiveTabChange = () => {},
   initialMembers,
   schedules,
   onSchedulesChange,
@@ -349,9 +359,13 @@ export function Admin({
   onSettlementsChange,
   apiRequest,
   sheetLoadError,
+  isWindows = false,
+  onOpenManual = () => {},
 }) {
-  const [activeTab, setActiveTab] = useState('schedule');
   const [centerAlert, setCenterAlert] = useState(''); // 화면 중앙 팝업 상태 추가
+  const [registerPrefill, setRegisterPrefill] = useState(null);
+  const [assistantDataMenuRequest, setAssistantDataMenuRequest] = useState(0);
+  const [assistantSettlementRequest, setAssistantSettlementRequest] = useState(null);
   const data = useAdminData({
     initialMembers,
     schedules,
@@ -378,6 +392,7 @@ export function Admin({
             onArchiveView={() => data.setIsArchiveOpen(true)}
             onClearData={() => data.setIsClearConfirm(true)}
             apiRequest={apiRequest}
+            assistantOpenRequest={assistantDataMenuRequest}
           />
         </div>
       </div>
@@ -403,19 +418,19 @@ export function Admin({
       <nav className="admin-tabs" aria-label="관리자 메뉴" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {/* 좌측 탭 메뉴 */}
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className={activeTab === 'schedule' ? 'active' : ''} onClick={() => setActiveTab('schedule')}>
+          <button className={activeTab === 'schedule' ? 'active' : ''} onClick={() => onActiveTabChange('schedule')}>
             ▦ <span>스케줄표</span>
           </button>
-          <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>
+          <button className={activeTab === 'members' ? 'active' : ''} onClick={() => onActiveTabChange('members')}>
             ♙ <span>회원정보</span>
           </button>
-          <button className={activeTab === 'settlements' ? 'active' : ''} onClick={() => setActiveTab('settlements')}>
+          <button className={activeTab === 'settlements' ? 'active' : ''} onClick={() => onActiveTabChange('settlements')}>
             ₩ <span>정산</span>
           </button>
         </div>
 
         {/* 우측에 항상 고정될 회원 등록 버튼 */}
-        <button className="member-register-btn" onClick={() => data.setIsRegisterOpen(true)}>
+        <button className="member-register-btn" onClick={() => { setRegisterPrefill(null); data.setIsRegisterOpen(true); }}>
           <span>＋ 회원등록</span>
         </button>
       </nav>
@@ -425,7 +440,7 @@ export function Admin({
           members={members}
           memberPassSummary={data.memberPassSummary}
           onOpenMember={data.setSelectedMember}
-          onOpenRegister={() => data.setIsRegisterOpen(true)}
+          onOpenRegister={() => { setRegisterPrefill(null); data.setIsRegisterOpen(true); }}
           onReregister={data.setReregisterMember}
         />
       ) : activeTab === 'settlements' ? (
@@ -436,6 +451,7 @@ export function Admin({
           onMoveMonth={data.moveMonth}
           onSave={data.saveSettlement}
           onDelete={data.deleteSettlement}
+          assistantRequest={assistantSettlementRequest}
         />
       ) : (
         <ScheduleSection
@@ -455,11 +471,12 @@ export function Admin({
         />
       )}
 
-      {data.selectedMember && <MemberDetail member={data.selectedMember} adminMember={members.find((item) => item.role === '관리자' || item.name === '관리자')} schedules={lessons} passes={passList.filter((pass) => pass.name === data.selectedMember.name)} onSave={data.updateMember} onDelete={data.deleteMember} onAddPass={data.addPass} onDeletePass={data.removePass} onClose={() => data.setSelectedMember(null)} />}
+      {data.selectedMember && <MemberDetail member={data.selectedMember} schedules={lessons} passes={passList.filter((pass) => pass.name === data.selectedMember.name)} onSave={data.updateMember} onDelete={data.deleteMember} onClose={() => data.setSelectedMember(null)} />}
 
       {/* 회원 등록 결과 메시지를 받아서 중앙 팝업으로 띄우고 완료 시 팝업 닫기 */}
       {data.isRegisterOpen && (
         <MemberRegister
+          member={registerPrefill}
           onSave={async (formData) => {
             try {
               await data.registerMember(formData);
@@ -468,7 +485,7 @@ export function Admin({
               setCenterAlert(error.message);
             }
           }}
-          onClose={() => data.setIsRegisterOpen(false)}
+          onClose={() => { data.setIsRegisterOpen(false); setRegisterPrefill(null); }}
         />
       )}
 
@@ -494,6 +511,72 @@ export function Admin({
             </div>
           </div>
         </div>
+      )}
+      {isWindows && (
+        <AiAssistantDrawer
+          members={members}
+          schedules={lessons}
+          settlements={data.settlementList}
+          selectedMonth={selectedMonth}
+          onNavigateToMembers={() => onActiveTabChange('members')}
+          onNavigateToSchedules={(month) => {
+            if (month) data.setSelectedMonth(month);
+            onActiveTabChange('schedule');
+          }}
+          onNavigateToSettlements={() => onActiveTabChange('settlements')}
+          onOpenMemberDetails={(member) => {
+            data.setSelectedMember(member);
+            onActiveTabChange('members');
+          }}
+          onOpenReregister={(member) => {
+            data.setReregisterMember(member);
+            onActiveTabChange('members');
+          }}
+          onOpenScheduleEditor={(schedule) => {
+            data.setSelectedDate(null);
+            data.setEditingLesson(schedule);
+            onActiveTabChange('schedule');
+          }}
+          onOpenScheduleDate={(date, memberName) => {
+            data.setEditingLesson(null);
+            data.setScheduleFilter(memberName || '전체');
+            data.setSelectedDate(date);
+            onActiveTabChange('schedule');
+          }}
+          onOpenSettlement={(request) => {
+            setAssistantSettlementRequest((current) => ({
+              ...request,
+              id: (current?.id || 0) + 1,
+            }));
+            if (request.date) data.setSelectedMonth(request.date.slice(0, 7));
+            onActiveTabChange('settlements');
+          }}
+          onOpenArchive={() => data.setIsArchiveOpen(true)}
+          onOpenClearData={() => data.setIsClearConfirm(true)}
+          onOpenDataManager={() => setAssistantDataMenuRequest((current) => current + 1)}
+          onOpenManual={onOpenManual}
+          onOpenMemberRegister={(name) => {
+            setRegisterPrefill(name ? { name } : null);
+            data.setSelectedMember(null);
+            data.setIsRegisterOpen(true);
+            onActiveTabChange('members');
+          }}
+          onOpenMemberSchedule={(name) => {
+            if (name) data.setScheduleFilter(name);
+            onActiveTabChange('schedule');
+          }}
+          dataLoadError={sheetLoadError}
+          onAddMemberLessons={async (payload) => {
+            const result = await apiRequest(payload);
+            if (!result?.success) {
+              throw new Error(result?.error || '레슨 등록을 완료하지 못했습니다.');
+            }
+            onSchedulesChange(normalizeSchedules(result.schedules || []));
+            onPassesChange(result.passes || []);
+            onActiveTabChange('schedule');
+            return result;
+          }}
+        />
       )}
     </div>
   );

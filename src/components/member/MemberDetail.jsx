@@ -1,10 +1,6 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Backdrop } from '../common';
-
-function currentLocalDate() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
 
 function formatPhoneNumber(value) {
   if (!value) return '';
@@ -116,7 +112,6 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
-  const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
 
   const historyValue = member.status === '탈퇴' ? '탈퇴' : (member.history === '탈퇴' ? '탈퇴' : '이용중');
@@ -128,13 +123,10 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
   });
   const [confirmAction, setConfirmAction] = useState('');
   const [newTotal, setNewTotal] = useState('8');
-  const [lessonSlots, setLessonSlots] = useState([{ weekday: 1, time: '10:00' }]);
-  const [isPassEditorOpen, setIsPassEditorOpen] = useState(false);
-  const [passError, setPassError] = useState('');
   const [selectedPass, setSelectedPass] = useState(null);
-  const [passToDelete, setPassToDelete] = useState(null);
-  const [isAddingPass, setIsAddingPass] = useState(false);
-  const [centerAlert, setCenterAlert] = useState('');
+  const [newPassError, setNewPassError] = useState('');
+  const [draftPasses, setDraftPasses] = useState(() => (passes || []).map((pass) => ({ ...pass })));
+  const [deletedPassIds, setDeletedPassIds] = useState([]);
 
   const handleMouseDown = (e) => {
     if (['INPUT', 'SELECT', 'BUTTON', 'TEXTAREA', 'OPTION'].includes(e.target.tagName)) return;
@@ -155,20 +147,9 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
       window.removeEventListener('mouseup', handleMouseUp);
     };
 
-    setIsDragging(true);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   };
-
-  const [form, setForm] = useState({
-    ...member,
-    phone: formatPhoneNumber(member.phone)
-  });
-  const [confirmAction, setConfirmAction] = useState('');
-  const [newTotal, setNewTotal] = useState('8');
-  const [newPassError, setNewPassError] = useState('');
-  const [draftPasses, setDraftPasses] = useState(() => (passes || []).map((pass) => ({ ...pass })));
-  const [deletedPassIds, setDeletedPassIds] = useState([]);
 
   const changeField = (event) => {
     const { name, value } = event.target;
@@ -209,15 +190,6 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
           transition: isDragging ? 'none' : 'transform 0.1s ease-out'
         }}
       >
-        {centerAlert && (
-          <div className="member-register-alert-overlay">
-            <div className="member-register-alert-box">
-              <p>{centerAlert}</p>
-              <button onClick={() => setCenterAlert('')}>확인</button>
-            </div>
-          </div>
-        )}
-
         <div className="modal-header" onMouseDown={handleMouseDown} style={{ cursor: 'move', userSelect: 'none' }}>
           <div><h3>회원 상세 정보</h3></div>
         </div>
@@ -255,24 +227,15 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
 
         <div className="pass-section">
           <div className="pass-section-head"><span className="eyebrow">이용권</span></div>
-          <div className="passes-container">
-            {passes.length ? passes.map((pass) => (
-              <div className={`pass-row pass-card ${pass.status === '완료' ? 'done' : ''}`} key={pass.id}>
-                <button type="button" className="pass-card-view" onClick={() => setSelectedPass(pass)}>
-                  <b>{pass.used}/{pass.total}회</b>
-                  <span>{pass.status}</span>
-                  <i>{pass.registeredAt}</i>
-                  <span className="pass-view-label">레슨 일정 보기</span>
-                </button>
-                <button type="button" className="pass-del" onClick={() => setPassToDelete(pass)}>삭제</button>
-              </div>
-            )) : <p className="pass-empty">등록된 레슨 일정이 없어요.</p>}
-          </div>
-          <div className="pass-section-head"><span className="eyebrow">이용권</span></div>
           <div className="pass-list">
             {draftPasses.length ? draftPasses.map((pass, index) => (
               <div className="pass-row" key={pass.id ?? `draft-${index}`}>
                 <b>{pass.registeredAt || '이용권'}</b>
+                {pass.id != null && (
+                  <button type="button" className="pass-card-view" onClick={() => setSelectedPass(pass)}>
+                    레슨 일정 보기
+                  </button>
+                )}
                 <label>
                   전체 횟수
                   <input
@@ -325,64 +288,6 @@ export function MemberDetail({ member, schedules = [], passes = [], onSave, onDe
 
         {confirmAction && <DetailConfirm action={confirmAction} member={member} onConfirm={() => confirmAction === 'save' ? onSave(form, draftPasses, deletedPassIds) : onDelete()} onCancel={() => setConfirmAction('')} />}
       </div>
-      {isPassEditorOpen && (
-        <Backdrop className="pass-add-backdrop" onClose={() => setIsPassEditorOpen(false)}>
-          <section className="detail-modal pass-add-modal" role="dialog" aria-modal="true" aria-labelledby="pass-add-title">
-            <header className="modal-header">
-              <div><span className="eyebrow">PASS</span><h3 id="pass-add-title">{member.name} 회원 이용권 추가</h3></div>
-              <button type="button" className="close-button" onClick={() => setIsPassEditorOpen(false)} aria-label="닫기">×</button>
-            </header>
-            <label className="field">
-              <span>총 횟수</span>
-              <input type="number" min="1" step="1" value={newTotal} onChange={(event) => setNewTotal(event.target.value)} />
-            </label>
-            <div className="pass-add-slots">
-              <div className="pass-add-slots-head">
-                <span>레슨 요일 · 시간</span>
-                {lessonSlots.length < 4 && (
-                  <button type="button" className="member-add-btn" onClick={() => {
-                    setLessonSlots((current) => [...current, { weekday: 1, time: '10:00' }]);
-                  }}>＋ 일정 추가 ({lessonSlots.length}/4)</button>
-                )}
-              </div>
-              {lessonSlots.map((slot, index) => (
-                <div className="pass-add-slot" key={index}>
-                  <select aria-label={`레슨 ${index + 1} 요일`} value={slot.weekday} onChange={(event) => updateLessonSlot(index, 'weekday', event.target.value)}>
-                    {weekdayOptions.map((day) => <option key={day.value} value={day.value}>{day.label}요일</option>)}
-                  </select>
-                  <select aria-label={`레슨 ${index + 1} 시간`} value={slot.time.split(':')[0]} onChange={(event) => updateLessonSlot(index, 'hour', event.target.value)}>
-                    {hourOptions.filter((hour) => Number(hour) >= 6 && Number(hour) <= 22).map((hour) => <option key={hour} value={hour}>{hour}시</option>)}
-                  </select>
-                  <select aria-label={`레슨 ${index + 1} 분`} value={slot.time.split(':')[1]} onChange={(event) => updateLessonSlot(index, 'minute', event.target.value)}>
-                    {minuteOptions.map((minute) => <option key={minute} value={minute}>{minute}분</option>)}
-                  </select>
-                  {lessonSlots.length > 1 && (
-                    <button type="button" className="member-del-btn" onClick={() => setLessonSlots((current) => current.filter((_, slotIndex) => slotIndex !== index))}>삭제</button>
-                  )}
-                </div>
-              ))}
-            </div>
-            {passError && <p className="pass-add-error" role="alert">{passError}</p>}
-            <div className="pass-add-actions">
-              <button type="button" className="cancel-button" onClick={() => setIsPassEditorOpen(false)} disabled={isAddingPass}>취소</button>
-              <button type="button" className="primary-button" onClick={submitNewPass} disabled={isAddingPass}>{isAddingPass ? '추가 중…' : '이용권 추가'}</button>
-            </div>
-          </section>
-        </Backdrop>
-      )}
-      {passToDelete && (
-        <PassDeleteConfirm
-          pass={passToDelete}
-          adminMember={adminMember}
-          onCancel={() => setPassToDelete(null)}
-          onConfirm={async () => {
-            await onDeletePass?.(passToDelete);
-            if (String(selectedPass?.id) === String(passToDelete.id)) setSelectedPass(null);
-            setPassToDelete(null);
-            setCenterAlert('이용권과 연결된 레슨 일정을 삭제했어요.');
-          }}
-        />
-      )}
       {selectedPass && <PassScheduleModal pass={selectedPass} schedules={schedules} onClose={() => setSelectedPass(null)} />}
     </Backdrop>
   );

@@ -197,7 +197,7 @@ export function MemberRegister({ onClose, onSave, member }) {
   };
 
   return (
-    <Backdrop onClose={onClose}>
+    <Backdrop onClose={onClose} className="member-register-backdrop">
       <div
         ref={modalBoxRef}
         className="member-register-modal"
@@ -223,7 +223,7 @@ export function MemberRegister({ onClose, onSave, member }) {
         )}
 
         <div className="modal-header" onMouseDown={handleMouseDown}>
-          <h3>{member ? '회원 상세 정보' : '회원 등록'}</h3>
+          <h3>회원 등록</h3>
         </div>
 
         <div className="detail-form">
@@ -424,7 +424,7 @@ export function MemberRegister({ onClose, onSave, member }) {
         </div>
 
         <div className="modal-footer">
-          <button onClick={handleSave} className="btn btn-save">{member ? '수정' : '등록'}</button>
+          <button onClick={handleSave} className="btn btn-save">등록</button>
           <button onClick={onClose} className="btn btn-cancel">취소</button>
         </div>
       </div>

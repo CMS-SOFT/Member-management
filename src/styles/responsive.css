@@ -149,10 +149,40 @@ button,
     .schedule-modal,
     .detail-modal,
     .modal-card,
+    .member-register-modal,
     .manual-modal,
     .archive-viewer,
     .reregister-modal {
         max-height: 88vh;
         overflow-y: auto;
+    }
+
+    .member-register-modal {
+        max-height: calc(100dvh - 24px);
+        padding: 16px;
+    }
+
+    .member-register-modal .detail-form {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .member-schedule-header,
+    .schedule-controls {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .start-date-wrapper {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .member-schedule-row {
+        grid-template-columns: minmax(0, 1fr) minmax(68px, .7fr) minmax(68px, .7fr);
+    }
+
+    .member-schedule-row .member-del-btn {
+        grid-column: 1 / -1;
     }
 }

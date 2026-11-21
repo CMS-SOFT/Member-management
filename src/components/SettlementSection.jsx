@@ -11,8 +11,8 @@ function toDateString(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function SettlementEditor({ members, entry, date, onClose, onSave, onDelete }) {
-  const [memberId, setMemberId] = useState(String(entry?.member_id || ''));
+function SettlementEditor({ members, entry, date, defaultMemberId, onClose, onSave, onDelete }) {
+  const [memberId, setMemberId] = useState(String(entry?.member_id || defaultMemberId || ''));
   const [amount, setAmount] = useState(entry ? String(entry.amount) : '');
   const [note, setNote] = useState(entry?.note || '');
   const [error, setError] = useState('');
@@ -113,10 +113,23 @@ function SettlementEditor({ members, entry, date, onClose, onSave, onDelete }) {
   );
 }
 
-export function SettlementSection({ members, settlements, selectedMonth, onMoveMonth, onSave, onDelete }) {
+export function SettlementSection({ members, settlements, selectedMonth, onMoveMonth, onSave, onDelete, assistantRequest }) {
   const [view, setView] = useState('calendar');
   const [editor, setEditor] = useState(null);
   const [memberFilter, setMemberFilter] = useState('all');
+  const [previousAssistantRequest, setPreviousAssistantRequest] = useState(assistantRequest);
+  if (assistantRequest !== previousAssistantRequest) {
+    setPreviousAssistantRequest(assistantRequest);
+    if (assistantRequest?.memberId != null) setMemberFilter(String(assistantRequest.memberId));
+    if (assistantRequest?.openEditor && assistantRequest.date) {
+      setEditor({
+        date: assistantRequest.date,
+        entry: assistantRequest.entry || null,
+        memberId: assistantRequest.memberId,
+      });
+    }
+  }
+
   const monthEntries = (settlements || [])
     .filter((item) => String(item.date || '').startsWith(selectedMonth))
     .sort((a, b) => a.date.localeCompare(b.date)
@@ -237,6 +250,7 @@ export function SettlementSection({ members, settlements, selectedMonth, onMoveM
           members={people}
           date={editor.date}
           entry={editor.entry}
+          defaultMemberId={editor.memberId}
           onClose={() => setEditor(null)}
           onSave={onSave}
           onDelete={onDelete}

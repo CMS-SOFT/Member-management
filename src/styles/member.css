@@ -411,3 +411,247 @@
 .reregister-preview b {
     color: var(--wine);
 }
+
+/* ── 회원 등록 모달 ── */
+.modal-backdrop.member-register-backdrop {
+    z-index: 1301;
+}
+
+.member-register-modal {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(760px, 100%);
+    max-height: calc(100dvh - 40px);
+    min-height: 0;
+    padding: 22px 24px 18px;
+    overflow: hidden;
+    border: 1px solid #eee0e4;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 18px 45px #0003;
+}
+
+.member-register-modal .modal-header {
+    flex: 0 0 auto;
+    align-items: center;
+    padding-bottom: 12px;
+}
+
+.member-register-modal .modal-header h3 {
+    margin: 0;
+    color: var(--ink);
+    font-size: 19px;
+}
+
+.member-register-modal .detail-form {
+    flex: 1 1 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
+    min-height: 0;
+    padding: 8px 2px 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.member-register-modal .detail-form .field {
+    min-width: 0;
+    gap: 6px;
+    margin: 0;
+    color: var(--ink);
+}
+
+.member-register-modal .detail-form .field input,
+.member-register-modal .detail-form .field select {
+    min-width: 0;
+    height: 40px;
+    border: 1px solid #d9d1d4;
+    border-radius: 5px;
+    color: var(--ink);
+    background: #fff;
+    font-size: 13px;
+}
+
+.member-register-modal .detail-form .field input:focus,
+.member-register-modal .detail-form .field select:focus {
+    border-color: var(--wine);
+    outline: none;
+    box-shadow: 0 0 0 3px #91002f12;
+}
+
+.member-register-modal .full-width {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+.member-schedule-container {
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid #eee0e4;
+    border-radius: 8px;
+    background: #fdf9fa;
+}
+
+.register-pass-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.register-pass-option input {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    accent-color: var(--wine);
+}
+
+.member-schedule-header,
+.schedule-controls,
+.start-date-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.member-schedule-header {
+    flex-wrap: wrap;
+}
+
+.schedule-title {
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.start-date-label {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.start-date-input {
+    min-width: 0;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid #d9d1d4;
+    border-radius: 5px;
+    background: #fff;
+    font-size: 12px;
+}
+
+.member-add-btn,
+.member-del-btn {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 11px;
+    border: 0;
+    border-radius: 5px;
+    color: #fff;
+    background: var(--wine);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.member-schedule-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(76px, .7fr) minmax(76px, .7fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.member-schedule-row select {
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding: 0 8px;
+    border: 1px solid #d9d1d4;
+    border-radius: 5px;
+    color: var(--ink);
+    background: #fff;
+    font-size: 12px;
+}
+
+.member-del-btn {
+    background: #a94442;
+}
+
+.register-pass-note {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.member-register-modal .modal-footer {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+.member-register-modal .modal-footer .btn {
+    min-width: 74px;
+    min-height: 38px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.member-register-modal .modal-footer .btn-save {
+    border-color: var(--wine);
+    color: #fff;
+    background: var(--wine);
+}
+
+.member-register-modal .modal-footer .btn-cancel {
+    color: var(--ink);
+    background: #fff;
+}
+
+.member-register-alert-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    border-radius: inherit;
+    background: #28242a66;
+}
+
+.member-register-alert-box {
+    display: grid;
+    gap: 16px;
+    width: min(320px, 100%);
+    padding: 22px;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 12px 32px #0003;
+    text-align: center;
+}
+
+.member-register-alert-box p {
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.member-register-alert-box button {
+    min-height: 38px;
+    border: 0;
+    border-radius: 5px;
+    color: #fff;
+    background: var(--wine);
+    font-weight: 700;
+}

@@ -858,7 +858,140 @@ function startServer() {
     app.post('/api/action', (req, res) => {
         const { action, member, schedule } = req.body;
 
-        if (action === 'appendMember') {
+        if (action === 'appendMemberLessons') {
+            const { memberId, lessons, startDate } = req.body;
+            const normalizedMemberId = Number(memberId);
+            const lessonList = Array.isArray(lessons) ? lessons : [];
+            if (!Number.isInteger(normalizedMemberId) || normalizedMemberId <= 0 ||
+                lessonList.length < 1 || lessonList.length > 4) {
+                return res.status(400).json({ success: false, error: '회원과 주간 레슨 횟수를 확인해 주세요.' });
+            }
+
+            const lessonKeys = new Set();
+            for (const lesson of lessonList) {
+                const day = lesson.day || lesson.dayOfWeek;
+                const time = String(lesson.time || '');
+                const key = `${day}_${time}`;
+                if (dayMap[day] === undefined || !/^([01]\d|2[0-3]):(00|20|40)$/.test(time) || lessonKeys.has(key)) {
+                    return res.status(400).json({ success: false, error: '레슨 요일과 시간을 확인해 주세요. 같은 요일·시간은 중복 등록할 수 없습니다.' });
+                }
+                lessonKeys.add(key);
+            }
+
+            const baseStartDate = startDate ? new Date(`${startDate}T00:00:00`) : new Date();
+            if (Number.isNaN(baseStartDate.getTime()) || (startDate && toYmd(baseStartDate) !== startDate)) {
+                return res.status(400).json({ success: false, error: '레슨 시작일을 확인해 주세요.' });
+            }
+
+            dbGet(
+                `SELECT id, name, lessonType, status FROM members WHERE id=? AND use_flag='Y'`,
+                [normalizedMemberId],
+                (memberError, existingMember) => {
+                    if (memberError) return res.status(500).json({ success: false, error: memberError.message });
+                    if (!existingMember) return res.status(404).json({ success: false, error: '등록된 회원을 찾지 못했습니다.' });
+                    if (existingMember.status === '탈퇴') {
+                        return res.status(400).json({ success: false, error: '탈퇴 회원에게 레슨을 추가할 수 없습니다.' });
+                    }
+
+                    const lessonType = existingMember.lessonType || '개인';
+                    if (!['개인', '단체'].includes(lessonType)) {
+                        return res.status(400).json({ success: false, error: '회원의 레슨 유형을 확인해 주세요.' });
+                    }
+
+                    dbAll(
+                        `SELECT day, time FROM member_lessons WHERE member_id=? AND use_flag='Y'`,
+                        [normalizedMemberId],
+                        (existingLessonError, existingLessons) => {
+                            if (existingLessonError) return res.status(500).json({ success: false, error: existingLessonError.message });
+                            const existingLessonKeys = new Set((existingLessons || []).map((lesson) => `${lesson.day}_${lesson.time}`));
+                            if (lessonList.some((lesson) => existingLessonKeys.has(`${lesson.day || lesson.dayOfWeek}_${lesson.time}`))) {
+                                return res.status(400).json({ success: false, error: '이미 등록된 요일·시간입니다. 기존 레슨을 유지하고 다른 시간으로 추가해 주세요.' });
+                            }
+
+                            const plannedSchedules = [];
+                            lessonList.forEach((lesson) => {
+                                const day = lesson.day || lesson.dayOfWeek;
+                                for (let week = 0; week < 4; week += 1) {
+                                    plannedSchedules.push({
+                                        date: toYmd(getNextDayOfWeek(baseStartDate, dayMap[day], week)),
+                                        time: lesson.time,
+                                        day,
+                                    });
+                                }
+                            });
+
+                            dbAll(
+                                `SELECT date, time FROM schedules WHERE member_id=? AND use_flag='Y'`,
+                                [normalizedMemberId],
+                                (existingScheduleError, existingSchedules) => {
+                                    if (existingScheduleError) return res.status(500).json({ success: false, error: existingScheduleError.message });
+                                    const existingScheduleKeys = new Set((existingSchedules || []).map((item) => `${item.date}_${item.time}`));
+                                    const duplicateSchedule = plannedSchedules.find((item) => existingScheduleKeys.has(`${item.date}_${item.time}`));
+                                    if (duplicateSchedule) {
+                                        return res.status(400).json({
+                                            success: false,
+                                            error: `${duplicateSchedule.date} ${duplicateSchedule.time}에 이미 등록된 일정이 있습니다.`,
+                                        });
+                                    }
+
+                                    const checkAvailability = (index) => {
+                                        if (index >= plannedSchedules.length) {
+                                            insertLessons();
+                                            return;
+                                        }
+                                        const planned = plannedSchedules[index];
+                                        checkLessonAvailability(
+                                            planned.date,
+                                            planned.time,
+                                            lessonType,
+                                            existingMember.name,
+                                            (availabilityError, availability) => {
+                                                if (availabilityError) return res.status(500).json({ success: false, error: availabilityError.message });
+                                                if (!availability.allowed) return res.status(400).json({ success: false, error: availability.error });
+                                                checkAvailability(index + 1);
+                                            }
+                                        );
+                                    };
+
+                                    const insertLessons = () => {
+                                        let passId;
+                                        dbTransaction((database) => {
+                                            lessonList.forEach((lesson) => {
+                                                database.run(
+                                                    `INSERT INTO member_lessons (member_id,name,day,time,use_flag) VALUES (?,?,?,?,'Y')`,
+                                                    [normalizedMemberId, existingMember.name, lesson.day || lesson.dayOfWeek, lesson.time]
+                                                );
+                                            });
+
+                                            const totalPassCount = lessonList.length * 4;
+                                            database.run(
+                                                `INSERT INTO passes (member_id,name,total,used,remaining,status,registeredAt,use_flag)
+                                                 VALUES (?,?,?,0,?,'이용중',?,'Y')`,
+                                                [normalizedMemberId, existingMember.name, totalPassCount, totalPassCount, toYmd(baseStartDate)]
+                                            );
+                                            passId = database.exec('SELECT last_insert_rowid() AS id')[0].values[0][0];
+
+                                            plannedSchedules.forEach((planned) => {
+                                                database.run(
+                                                    `INSERT INTO schedules (date,time,member_id,name,status,note,passId,use_flag)
+                                                     VALUES (?,?,?,?,'예약',?,?,'Y')`,
+                                                    [planned.date, planned.time, normalizedMemberId, existingMember.name, '정규 레슨', passId]
+                                                );
+                                            });
+                                        }, (transactionError) => {
+                                            if (transactionError) return res.status(500).json({ success: false, error: transactionError.message });
+                                            sendFreshData(res, { memberId: normalizedMemberId, passId });
+                                        });
+                                    };
+
+                                    checkAvailability(0);
+                                }
+                            );
+                        }
+                    );
+                }
+            );
+        } else if (action === 'appendMember') {
             if (!member) return res.status(400).json({ success: false, error: 'member data is missing' });
 
             const {
@@ -1073,24 +1206,31 @@ function startServer() {
             });
 
         } else if (action === 'deleteMember') {
-            const memberId = member?.id;
-            const memberName = member?.name || req.body.originalName;
-
-            if (!memberId && !memberName) {
+            const memberId = Number(member?.id);
+            const memberName = String(member?.name || req.body.originalName || '').trim();
+            const byId = Number.isSafeInteger(memberId) && memberId > 0;
+            if (!byId && !memberName) {
                 return res.status(400).json({ success: false, error: 'member info is missing for deletion' });
             }
 
-            const byId = !!memberId;
             const col = byId ? 'id' : 'name';
             const colRel = byId ? 'member_id' : 'name';
             const param = byId ? memberId : memberName;
 
-            dbRun(`UPDATE members        SET use_flag='N' WHERE ${col}=?`, [param]);
-            dbRun(`UPDATE member_lessons SET use_flag='N' WHERE ${colRel}=?`, [param]);
-            dbRun(`UPDATE passes         SET use_flag='N' WHERE ${colRel}=?`, [param]);
-            dbRun(`UPDATE schedules      SET use_flag='N' WHERE ${colRel}=?`, [param]);
-            dbRun(`UPDATE settlements    SET use_flag='N' WHERE ${colRel}=?`, [param], () => {
-                sendFreshData(res);
+            dbGet(`SELECT id FROM members WHERE ${col}=? AND use_flag='Y'`, [param], (findError, existingMember) => {
+                if (findError) return res.status(500).json({ success: false, error: findError.message });
+                if (!existingMember) return res.status(404).json({ success: false, error: '등록된 회원을 찾지 못했습니다.' });
+
+                dbTransaction((database) => {
+                    database.run(`UPDATE members SET use_flag='N' WHERE ${col}=?`, [param]);
+                    database.run(`UPDATE member_lessons SET use_flag='N' WHERE ${colRel}=?`, [param]);
+                    database.run(`UPDATE passes SET use_flag='N' WHERE ${colRel}=?`, [param]);
+                    database.run(`UPDATE schedules SET use_flag='N' WHERE ${colRel}=?`, [param]);
+                    database.run(`UPDATE settlements SET use_flag='N' WHERE ${colRel}=?`, [param]);
+                }, (deleteError) => {
+                    if (deleteError) return res.status(500).json({ success: false, error: deleteError.message });
+                    sendFreshData(res);
+                });
             });
 
         } else if (action === 'appendPass') {

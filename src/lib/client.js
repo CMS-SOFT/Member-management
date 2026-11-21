@@ -11,7 +11,15 @@ export async function requestServer(endpoint, options = {}) {
             ...options,
         });
 
-        const data = await response.json();
+        const responseBody = await response.text();
+        let data;
+        try {
+            data = responseBody ? JSON.parse(responseBody) : null;
+        } catch {
+            throw new Error(
+                `서버가 JSON이 아닌 응답을 반환했습니다 (HTTP ${response.status}). 백엔드 서버를 확인한 뒤 다시 시도해 주세요.`
+            );
+        }
         if (!response.ok) {
             const errorMessage =
                 data?.error ||
